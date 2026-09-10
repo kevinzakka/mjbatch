@@ -1,6 +1,6 @@
 # mjbatch
 
-`mjbatch` is a Python library for running thousands of MuJoCo simulations in parallel on the CPU.
+`mjbatch` is a Python library for running thousands of MuJoCo simulations in parallel on CPU.
 
 Features include:
 
@@ -32,10 +32,10 @@ RL controller learns to walk in under a minute on a five-year-old M1 laptop.
 <table>
   <tr>
     <td align="center" width="50%">
-      <a href="examples/cartpole_swingup.py"><img width="400" src="examples/assets/cartpole_swingup.gif" alt="cart-pole swing-up"></a>
+      <a href="https://github.com/kevinzakka/mjbatch/blob/main/examples/cartpole_swingup.py"><img width="400" src="https://raw.githubusercontent.com/kevinzakka/mjbatch/main/examples/assets/cartpole_swingup.gif" alt="cart-pole swing-up"></a>
     </td>
     <td align="center" width="50%">
-      <a href="examples/cartpole_mpc.py"><img width="400" src="examples/assets/cartpole_mpc.gif" alt="cart-pole MPC"></a>
+      <a href="https://github.com/kevinzakka/mjbatch/blob/main/examples/cartpole_mpc.py"><img width="400" src="https://raw.githubusercontent.com/kevinzakka/mjbatch/main/examples/assets/cartpole_mpc.gif" alt="cart-pole MPC"></a>
     </td>
   </tr>
   <tr>
@@ -44,10 +44,10 @@ RL controller learns to walk in under a minute on a five-year-old M1 laptop.
   </tr>
   <tr>
     <td align="center" width="50%">
-      <a href="examples/g1_flip.py"><img width="400" src="examples/assets/g1_flip.gif" alt="G1 backflip"></a>
+      <a href="https://github.com/kevinzakka/mjbatch/blob/main/examples/g1_flip.py"><img width="400" src="https://raw.githubusercontent.com/kevinzakka/mjbatch/main/examples/assets/g1_flip.gif" alt="G1 backflip"></a>
     </td>
     <td align="center" width="50%">
-      <a href="examples/go1_joystick.py"><img width="400" src="examples/assets/go1_joystick.gif" alt="Go1 joystick"></a>
+      <a href="https://github.com/kevinzakka/mjbatch/blob/main/examples/go1_joystick.py"><img width="400" src="https://raw.githubusercontent.com/kevinzakka/mjbatch/main/examples/assets/go1_joystick.gif" alt="Go1 joystick"></a>
     </td>
   </tr>
   <tr>
@@ -56,10 +56,10 @@ RL controller learns to walk in under a minute on a five-year-old M1 laptop.
   </tr>
   <tr>
     <td align="center" width="50%">
-      <a href="examples/arm_throw.py"><img width="400" src="examples/assets/arm_throw.gif" alt="throwing arm co-design"></a>
+      <a href="https://github.com/kevinzakka/mjbatch/blob/main/examples/arm_throw.py"><img width="400" src="https://raw.githubusercontent.com/kevinzakka/mjbatch/main/examples/assets/arm_throw.gif" alt="throwing arm co-design"></a>
     </td>
     <td align="center" width="50%">
-      <a href="examples/rizon_inertia.py"><img width="400" src="examples/assets/rizon_inertia.gif" alt="Rizon inertia identification"></a>
+      <a href="https://github.com/kevinzakka/mjbatch/blob/main/examples/rizon_inertia.py"><img width="400" src="https://raw.githubusercontent.com/kevinzakka/mjbatch/main/examples/assets/rizon_inertia.gif" alt="Rizon inertia identification"></a>
     </td>
   </tr>
   <tr>

@@ -1,11 +1,11 @@
 [build-system]
-requires = ["scikit-build-core>=0.10", "nanobind>=2.2.0", "mujoco==3.11.0"]
+requires = ["scikit-build-core>=1.0", "nanobind>=2.2.0", "mujoco==3.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "mjbatch"
 version = "0.1.0"
-description = "Batched CPU MuJoCo: N simulations stepped on a C++ thread pool."
+description = "A Python library for running thousands of MuJoCo simulations in parallel on CPU."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
@@ -13,7 +13,6 @@ authors = [{ name = "Kevin Zakka", email = "zakka@berkeley.edu" }]
 keywords = ["mujoco", "physics", "simulation", "batched", "reinforcement-learning"]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "Framework :: Robot Framework :: Library",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
   "Operating System :: MacOS",
@@ -47,19 +46,10 @@ examples = [
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["src/mjbatch"]
-
-# The sdist defaults to everything git does not ignore, which is the whole working tree,
-# worktrees and lab notebooks included. Ship what builds, tests and demonstrates it.
-sdist.exclude = [
-  ".claude",
-  ".github",
-  "build",
-  "typings",
-  "Makefile",
-  "uv.lock",
-  "*.mp4",
-  "*.gif",  # the README points at the copy on GitHub, which PyPI can reach
-]
+wheel.exclude = ["mjbatch/csrc"]
+sdist.inclusion-mode = "explicit"
+sdist.include = ["src", "CMakeLists.txt", "LICENSE", "README.md", "pyproject.toml"]
+sdist.exclude = ["__pycache__"]
 
 [tool.ruff]
 indent-width = 2
@@ -94,7 +84,7 @@ test-command = "pytest {project}/tests"
 repair-wheel-command = "auditwheel repair --exclude libmujoco.so.3.11.0 -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.macos]
-repair-wheel-command = "delocate-wheel --exclude libmujoco.3.11.0.dylib --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+repair-wheel-command = "delocate-wheel --ignore-missing-dependencies --exclude libmujoco.3.11.0.dylib --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
 
 [tool.uv.sources]
 # CUDA wheels built against the 12.8 driver on the Linux boxes; PyPI's default torch
