@@ -1,5 +1,8 @@
 # mjbatch
 
+[![Build](https://img.shields.io/github/actions/workflow/status/kevinzakka/mjbatch/ci.yml?branch=main)](https://github.com/kevinzakka/mjbatch/actions)
+[![PyPI version](https://img.shields.io/pypi/v/mjbatch)](https://pypi.org/project/mjbatch/)
+
 `mjbatch` is a Python library for running thousands of MuJoCo simulations in parallel on CPU.
 
 Features include:
