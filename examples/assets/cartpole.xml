@@ -1,0 +1,25 @@
+<mujoco model="cart-pole">
+  <include file="theme.xml"/>
+  <option timestep="0.01">
+    <flag contact="disable"/>
+  </option>
+  <worldbody>
+    <camera name="side" pos="0 -3.0 1.0" xyaxes="1 0 0 0 .08 .997" fovy="42"/>
+    <geom type="capsule" pos="0 .05 .75" zaxis="1 0 0" size=".015 1.1" rgba=".45 .47 .5 1"/>
+    <geom type="capsule" pos="0 -.05 .75" zaxis="1 0 0" size=".015 1.1" rgba=".45 .47 .5 1"/>
+    <body name="cart" pos="0 0 .75">
+      <joint name="slide" type="slide" axis="1 0 0" range="-1 1" solreflimit=".08 1" damping=".05"/>
+      <geom type="box" size=".12 .1 .06" mass="1" rgba=".24 .2 .18 1"/>
+      <body name="pole">
+        <joint name="hinge" axis="0 1 0" damping=".01"/>
+        <geom type="capsule" fromto="0 0 0 0 0 .6" size=".025" mass=".3" rgba=".9 .87 .8 1"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor joint="slide" gear="15" ctrlrange="-1 1"/>
+  </actuator>
+  <keyframe>
+    <key name="hang" qpos="0 3.14159265358979"/>
+  </keyframe>
+</mujoco>

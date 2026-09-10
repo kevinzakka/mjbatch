@@ -1,0 +1,52 @@
+<mujoco model="throwing arm">
+  <include file="theme.xml"/>
+  <default>
+    <geom contype="0" conaffinity="0"/>
+    <joint axis="0 -1 0" damping="0.015"/>
+    <default class="hub">
+      <geom type="cylinder" size=".07 .049" quat="1 1 0 0" material="metal"/>
+    </default>
+  </default>
+  <asset>
+    <material name="clay" rgba=".62 .30 .20 1" specular=".35" shininess=".35"/>
+    <material name="metal" rgba=".23 .25 .26 1" specular=".5" shininess=".5"/>
+    <material name="trim" rgba=".77 .65 .45 1" specular=".5" shininess=".5"/>
+    <material name="ball" rgba=".87 .73 .46 1" specular=".35" shininess=".35"/>
+  </asset>
+  <worldbody>
+    <geom type="cylinder" pos="0 .10 .055" size=".24 .055" material="metal"/>
+    <geom type="box" pos="0 .10 .59" size=".055 .065 .50" material="metal"/>
+    <geom type="cylinder" pos="0 .10 1.18" size=".105 .10" quat="1 1 0 0" material="metal"/>
+    <body name="upper" pos="0 0 1.18">
+      <joint name="shoulder"/>
+      <inertial pos="0 0 0" mass="1" diaginertia="1 1 1"/>
+      <geom name="upper_beam" type="box" size=".25 .028 .038" material="clay"/>
+      <geom name="upper_trim" type="box" pos="0 -.03 0" size=".20 .004 .012" material="trim"/>
+      <geom name="upper_hub" class="hub"/>
+      <geom type="cylinder" pos="0 -.054 0" size=".041 .008" quat="1 1 0 0" material="trim"/>
+      <body name="lower">
+        <joint name="elbow"/>
+        <inertial pos="0 0 0" mass="1" diaginertia="1 1 1"/>
+        <geom name="lower_beam" type="box" size=".25 .028 .038" material="clay"/>
+        <geom name="lower_trim" type="box" pos="0 -.03 0" size=".20 .004 .012" material="trim"/>
+        <geom class="hub"/>
+        <geom type="cylinder" pos="0 -.054 0" size=".041 .008" quat="1 1 0 0" material="trim"/>
+        <body name="hand">
+          <geom type="sphere" size=".055" mass=".04" material="metal"/>
+          <site name="grip" pos=".065 0 0" size=".005" rgba="0 0 0 0"/>
+        </body>
+      </body>
+    </body>
+    <body name="ball" pos="1.065 0 1.18">
+      <freejoint/>
+      <geom name="ball" type="sphere" size=".045" mass=".15" material="ball"
+            contype="1" conaffinity="1" friction=".6 .01 .001" solref=".015 1"/>
+      <site name="payload" size=".005" rgba="0 0 0 0"/>
+    </body>
+  </worldbody>
+  <equality><connect name="grasp" site1="grip" site2="payload" solref=".004 1"/></equality>
+  <actuator>
+    <motor name="shoulder_motor" joint="shoulder"/>
+    <motor name="elbow_motor" joint="elbow"/>
+  </actuator>
+</mujoco>

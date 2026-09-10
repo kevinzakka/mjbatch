@@ -1,0 +1,31 @@
+<mujoco model="cart-poles">
+  <include file="theme.xml"/>
+  <option timestep="0.01" integrator="implicitfast">
+    <flag contact="disable"/>
+  </option>
+  <worldbody>
+    <camera name="side" pos="0 -5.8 3.1" xyaxes="1 0 0 0 .162 .987" fovy="42"/>
+    <geom type="capsule" pos="0 .07 2.15" zaxis="1 0 0" size=".02 2" rgba=".45 .47 .5 1"/>
+    <geom type="capsule" pos="0 -.07 2.15" zaxis="1 0 0" size=".02 2" rgba=".45 .47 .5 1"/>
+    <body name="cart" pos="0 0 2.15">
+      <joint name="slider" type="slide" axis="1 0 0" range="-1.8 1.8" solreflimit=".08 1" damping="5e-4"/>
+      <geom type="box" size=".2 .15 .1" mass="1" rgba=".24 .2 .18 1"/>
+      <body name="pole_1">
+        <joint name="hinge_1" axis="0 1 0" damping="2e-6"/>
+        <geom type="cylinder" fromto="0 -.06 0 0 .06 0" size=".053" mass="0" rgba=".45 .47 .5 1"/>
+        <geom type="capsule" fromto="0 0 0 0 0 1" size=".045" mass=".1" rgba=".9 .87 .8 1"/>
+        <body name="pole_2" pos="0 0 1">
+          <joint name="hinge_2" axis="0 1 0" damping="2e-6"/>
+          <geom type="cylinder" fromto="0 -.06 0 0 .06 0" size=".053" mass="0" rgba=".45 .47 .5 1"/>
+          <geom type="capsule" fromto="0 0 0 0 0 1" size=".045" mass=".1" rgba=".9 .87 .8 1"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="slide" joint="slider" gear="10" ctrlrange="-1 1"/>
+  </actuator>
+  <keyframe>
+    <key name="hang" qpos="0 3.14159265358979 0"/>
+  </keyframe>
+</mujoco>

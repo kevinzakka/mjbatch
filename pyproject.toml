@@ -1,0 +1,107 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.2.0", "mujoco==3.11.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "mjbatch"
+version = "0.1.0"
+description = "Batched CPU MuJoCo: N simulations stepped on a C++ thread pool."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Kevin Zakka", email = "zakka@berkeley.edu" }]
+keywords = ["mujoco", "physics", "simulation", "batched", "reinforcement-learning"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Robot Framework :: Library",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Free Threading :: 2 - Beta",
+  "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.10"
+dependencies = ["mujoco==3.11.0", "numpy"]
+
+[project.urls]
+Homepage = "https://github.com/kevinzakka/mjbatch"
+Repository = "https://github.com/kevinzakka/mjbatch"
+Issues = "https://github.com/kevinzakka/mjbatch/issues"
+
+[dependency-groups]
+dev = ["pytest", "ruff", "pyright", "nanobind>=2.2.0"]
+examples = [
+  "mediapy",
+  "mujoco-menagerie>=2026.9.0; python_full_version >= '3.10.12'",
+  "torch==2.9.0",
+]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["src/mjbatch"]
+
+# The sdist defaults to everything git does not ignore, which is the whole working tree,
+# worktrees and lab notebooks included. Ship what builds, tests and demonstrates it.
+sdist.exclude = [
+  ".claude",
+  ".github",
+  "build",
+  "typings",
+  "Makefile",
+  "uv.lock",
+  "*.mp4",
+  "*.gif",  # the README points at the copy on GitHub, which PyPI can reach
+]
+
+[tool.ruff]
+indent-width = 2
+line-length = 100
+exclude = [".venv", "build", "typings", "*.pyi"]
+src = ["src", "tests", "benchmarks", "examples"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+
+[tool.pyright]
+pythonVersion = "3.10"
+include = ["src", "tests"]
+extraPaths = ["examples", "lab"]
+stubPath = "typings"
+reportMissingModuleSource = false
+executionEnvironments = [{ root = "examples", reportCallIssue = false, reportOptionalSubscript = false }]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.cibuildwheel]
+build = "cp310-* cp311-* cp312-* cp313-* cp314-* cp314t-*"
+# Windows: the mujoco wheel ships mujoco.dll with no import library, and the
+# extension finds libmujoco by rpath, which Windows has no equivalent of.
+skip = "*-musllinux_* *-win* *_i686"
+enable = ["cpython-freethreading"]
+test-requires = "pytest"
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = "auditwheel repair --exclude libmujoco.so.3.11.0 -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+repair-wheel-command = "delocate-wheel --exclude libmujoco.3.11.0.dylib --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+
+[tool.uv.sources]
+# CUDA wheels built against the 12.8 driver on the Linux boxes; PyPI's default torch
+# targets a newer driver and fails to initialize CUDA there. macOS keeps PyPI's wheel.
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

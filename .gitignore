@@ -1,0 +1,13 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+.venv/
+.DS_Store
+MUJOCO_LOG.TXT
+examples/assets/g1_flip_plan.npz
+trash/
+benchmarks/inertia*
+.claude/

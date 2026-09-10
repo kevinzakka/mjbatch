@@ -1,0 +1,18 @@
+<mujoco>
+  <asset>
+    <texture name="checker" type="2d" builtin="checker" rgb1=".72 .69 .64" rgb2=".68 .65 .6" width="300" height="300"/>
+    <material name="ground" texture="checker" texrepeat=".625 .625" texuniform="true"/>
+    <texture name="sky" type="skybox" builtin="flat" rgb1=".47 .45 .42" rgb2=".47 .45 .42" width="32" height="32"/>
+  </asset>
+  <visual>
+    <headlight diffuse=".15 .15 .15" ambient=".3 .3 .3" specular=".2 .2 .2"/>
+    <rgba haze=".47 .45 .42 1" fog=".47 .45 .42 1"/>
+    <map fogstart="4" fogend="14"/>
+    <quality shadowsize="4096" offsamples="8"/>
+    <global offwidth="2400" offheight="1800"/>  <!-- offscreen renders match the window -->
+  </visual>
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 .1" material="ground"/>
+    <light name="sun" directional="true" dir="-.7 .5 -.6" pos="3.5 -2.5 5" diffuse=".65 .65 .65" specular=".3 .3 .3"/>
+  </worldbody>
+</mujoco>
