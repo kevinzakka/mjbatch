@@ -297,6 +297,16 @@ def test_step_history_validation(model):
   assert not np.any(batch.bind("time"))
 
 
+def test_step_history_accepts_degenerate_strides(model):
+  # numpy gives a size-0 array all-zero strides and a new axis a zero stride.
+  batch = Batch(model, N)
+  batch.step(np.zeros(N, dtype=bool), nstep=3, history=np.empty((0, 3, batch.nstate)))
+  history = np.empty((4, batch.nstate))
+  batch.step(np.array([2]), nstep=4, history=history[None])
+  np.testing.assert_array_equal(history[-1], batch.bind("state")[2])
+  assert not np.any(np.delete(batch.bind("time"), 2))
+
+
 def test_step_history_error_names_the_sim():
   batch = Batch(mujoco.MjModel.from_xml_string(LOCKSTEP_XML), N, num_threads=2)
   batch.expand("eq_type")[2] = 99
