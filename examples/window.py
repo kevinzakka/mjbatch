@@ -6,16 +6,9 @@ import glfw
 import mujoco
 import numpy as np
 
-LINE, CAPSULE, ARROW = (
-  mujoco.mjtGeom.mjGEOM_LINE,
-  mujoco.mjtGeom.mjGEOM_CAPSULE,
-  mujoco.mjtGeom.mjGEOM_ARROW,
-)
+LINE, CAPSULE, ARROW = mujoco.mjtGeom.mjGEOM_LINE, mujoco.mjtGeom.mjGEOM_CAPSULE, mujoco.mjtGeom.mjGEOM_ARROW
 GHOST, CHOSEN = (0.6, 0.6, 0.7, 0.25), (0.62, 0.3, 0.2, 1.0)
-CONTACT = {
-  "C": mujoco.mjtVisFlag.mjVIS_CONTACTPOINT,
-  "F": mujoco.mjtVisFlag.mjVIS_CONTACTFORCE,
-}
+CONTACT = {"C": mujoco.mjtVisFlag.mjVIS_CONTACTPOINT, "F": mujoco.mjtVisFlag.mjVIS_CONTACTFORCE}
 POINT, FORCE = (0.38, 0.4, 0.28, 1.0), (0.97, 0.94, 0.88, 1.0)
 
 
@@ -26,11 +19,7 @@ def clock(seconds):
 def progress(head, done, elapsed, tail, end=False):
   bar = "━" * round(20 * done) + "─" * (20 - round(20 * done))
   left = clock(elapsed / done - elapsed) if done else "-:--"
-  print(
-    f"\r{head} {bar} {clock(elapsed)}, {left} left  {tail}\x1b[K",
-    end="\n" if end else "",
-    flush=True,
-  )
+  print(f"\r{head} {bar} {clock(elapsed)}, {left} left  {tail}\x1b[K", end="\n" if end else "", flush=True)
 
 
 def polyline(scn, points, rgba, width, kind=LINE):
@@ -92,25 +81,21 @@ class Window:
     for key, flag in CONTACT.items():
       if self.pressed(key):
         self.option.flags[flag] = not self.option.flags[flag]
-    mujoco.mjv_updateScene(
-      self.model, self.data, self.option, self.perturb, self.camera,
-      mujoco.mjtCatBit.mjCAT_ALL, self.scene,
-    )  # fmt: skip
-    first = self.scene.ngeom
-    for ghost in ghosts:
-      mujoco.mjv_addGeoms(
-        *ghost, self.option, self.perturb, mujoco.mjtCatBit.mjCAT_DYNAMIC, self.scene
-      )
-    for geom in self.scene.geoms[first : self.scene.ngeom]:
-      geom.category = mujoco.mjtCatBit.mjCAT_DECOR
+    opt, pert, scene, cat = self.option, self.perturb, self.scene, mujoco.mjtCatBit
+    mujoco.mjv_updateScene(self.model, self.data, opt, pert, self.camera, cat.mjCAT_ALL, scene)
+    first = scene.ngeom
+    for m, d in ghosts:
+      mujoco.mjv_addGeoms(m, d, opt, pert, cat.mjCAT_DYNAMIC, scene)
+    for geom in scene.geoms[first : scene.ngeom]:
+      geom.category = cat.mjCAT_DECOR
     for trace in traces:
-      polyline(self.scene, *trace)
+      polyline(scene, *trace)
     if decor is not None:
-      decor(self.scene)
+      decor(scene)
     viewport = mujoco.MjrRect(0, 0, *glfw.get_framebuffer_size(self.window))
-    mujoco.mjr_render(viewport, self.scene, self.context)
+    mujoco.mjr_render(viewport, scene, self.context)
     if legend is not None:
       font, corner = mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT
-      mujoco.mjr_overlay(font, corner, viewport, *legend, self.context)
+      mujoco.mjr_overlay(font, corner, viewport, *legend, con=self.context)
     glfw.swap_buffers(self.window)
     glfw.poll_events()

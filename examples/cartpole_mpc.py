@@ -14,7 +14,7 @@ from window import CHOSEN, GHOST, Window
 MODEL = Path(__file__).parent / "assets" / "cartpole.xml"
 K, H, SUB = 1024, 25, 4  # rollouts, horizon knots, substeps per knot
 SIGMA, STEPS, NTRACE = 0.3, 150, 32  # control noise, headless control steps, rollouts drawn
-W_CART, W_SPEED, W_SPIN, W_CTRL = 0.1, 0.01, 0.01, 0.2  # cost weights
+W_CART, W_SPEED, W_SPIN, W_CTRL = 0.1, 0.01, 0.01, 0.2
 
 
 # The state x is (cart position, pole angle, cart speed, pole rate); angle 0 is upright.
@@ -32,7 +32,6 @@ def wrap(angles):
 
 
 def tips(xs, height):
-  """Return the pole's tip position along a trajectory, shape (len(xs), 3)."""
   cart, angle = xs[:, 0], xs[:, 1]
   return np.stack([cart + np.sin(angle), np.zeros_like(cart), height + np.cos(angle)], axis=-1)
 

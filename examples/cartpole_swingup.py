@@ -45,7 +45,7 @@ def expand(xs, us):
 
 class Planner:
   def __init__(self, model, T, sub, cost, expand):
-    self.model, self.T, self.sub = model, T, sub
+    self.T, self.sub = T, sub
     self.cost, self.expand = cost, expand
     self.nq, self.nv, self.nu = model.nq, model.nv, model.nu
     self.nx = 2 * self.nv
@@ -61,18 +61,10 @@ class Planner:
     self.warning = self.line.bind("warning")  # counters; an unstable sim resets and bumps them
 
   def step(self, x, u):
-    n = len(x)
-    self.qpos[:n], self.qvel[:n] = x[:, : self.nq], x[:, self.nq :]
-    self.ctrl[:n], self.warm[:n] = u, 0.0
-    ids = np.arange(n) if n < self.batch.num_sims else None  # a shorter horizon uses n sims
-    self.batch.step(ids, nstep=1)
-    self.probe(n)  # the sensors still read the input states here
-    if self.sub > 1:
-      self.batch.step(ids, nstep=self.sub - 1)
-    return np.concatenate([self.qpos[:n], self.qvel[:n]], axis=1)
-
-  def probe(self, n):
-    pass
+    self.qpos[:], self.qvel[:] = x[:, : self.nq], x[:, self.nq :]
+    self.ctrl[:], self.warm[:] = u, 0.0
+    self.batch.step(nstep=self.sub)
+    return np.concatenate([self.qpos, self.qvel], axis=1)
 
   def advance(self, x, u):
     qpos, qvel, ctrl, warm = self.line_fields
@@ -146,13 +138,10 @@ def backward(A, B, lx, lxx, lu, luu, lo, hi, mu):
   return k[:-1], K
 
 
-def ilqr(planner, x0, us, xs=None, watch=lambda xs: None, iters=ITERS, quiet=False):
+def ilqr(planner, x0, us, watch=lambda xs: None):
   T, nu, nx = planner.T, planner.nu, planner.nx
-  if xs is None:
-    xs, _, total = planner.rollout(x0, us)  # k=None: every sim replays us
-    xs, total = xs[:, 0], total[0]
-  else:
-    total = np.inf  # xs is a reference, not a rollout; accept the first step
+  xs, _, total = planner.rollout(x0, us)  # without gains, every sim replays us
+  xs, total = xs[:, 0], total[0]
   watch(xs)
 
   def derivatives():  # of the dynamics and the cost along xs, us, plus the control bounds
@@ -160,9 +149,9 @@ def ilqr(planner, x0, us, xs=None, watch=lambda xs: None, iters=ITERS, quiet=Fal
 
   mu, K, d = 1.0, np.zeros((T, nu, nx)), derivatives()
   start, alpha, stop = time.perf_counter(), 0.0, False
-  for it in range(iters):
+  for it in range(ITERS):
     accepted = False
-    if (sweep := backward(*d, mu)) is not None:
+    if (sweep := backward(*d, mu=mu)) is not None:
       k, K = sweep
       new_xs, new_us, totals = planner.rollout(x0, us, (xs, k, K))
       best = int(np.argmin(totals))
@@ -174,14 +163,8 @@ def ilqr(planner, x0, us, xs=None, watch=lambda xs: None, iters=ITERS, quiet=Fal
       mu *= 10.0
       stop = mu > 1e6
     watch(xs)
-    if not quiet:
-      progress(
-        f"iter {it + 1:3d}/{iters}",
-        (it + 1) / iters,
-        time.perf_counter() - start,
-        f"cost {total:9.4f}  alpha {alpha:.4f}  mu {mu:.0e}",
-        end=stop or it + 1 == iters,
-      )
+    done, tail = (it + 1) / ITERS, f"cost {total:9.4f}  alpha {alpha:.4f}  mu {mu:.0e}"
+    progress(f"iter {it + 1:3d}/{ITERS}", done, time.perf_counter() - start, tail, end=stop or done == 1)
     if stop:
       break
     if accepted:
@@ -230,8 +213,8 @@ def main():
     xs, us, K, _ = ilqr(planner, x0, us, watch=watch)
     # LQR gains to balance afterwards: the same backward pass over a plan resting upright.
     top = np.zeros((T + 1, NX)), np.zeros((T, NU))
-    box = np.full((T, NU), -1.0), np.full((T, NU), 1.0)
-    hold = backward(*planner.linearize(*top), *expand(*top), *box, 0.0)[1][0]
+    d = *planner.linearize(*top), *expand(*top), np.full((T, NU), -1.0), np.full((T, NU), 1.0)
+    hold = backward(*d, mu=0.0)[1][0]
     t = 0
     while window.open():  # play the plan under its gains, then balance
       x = np.concatenate([data.qpos, data.qvel])

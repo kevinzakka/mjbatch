@@ -24,9 +24,7 @@ START, END, LIFT = 0, 200, 0.001
 # Cost weights per m^2, rad^2, (m/s)^2, (rad/s)^2 of body error and per (N m)^2 of torque.
 W_POS, W_ROT, W_VEL, W_ANG, W_CTRL = 100.0, 100.0, 5.0, 1.0, 1e-2
 W_ROOT = np.array([1.0, 1.0, 1000.0])  # pelvis position weights: loose in x and y, tight in z
-HUBER = (
-  0.05  # a weighted position error above sqrt(W_POS) * HUBER grows linearly, not quadratically
-)
+HUBER = 0.05  # weighted position errors past sqrt(W_POS) * HUBER cost linearly, not quadratically
 HORIZON, STEP, ITERS = 50, 10, 20  # knots planned per window, knots committed, iLQR iterations
 SHADE = (0.62, 0.3, 0.2, 0.35)  # color of the reference robot
 HEAD = 0.43  # height of the drawn head point above the torso frame, m
@@ -37,10 +35,8 @@ BODIES = (  # bodies the cost tracks
   "left_shoulder_roll_link", "left_elbow_link",
   "right_shoulder_roll_link", "right_elbow_link",
 )  # fmt: skip
-TORSO, FEET = (
-  BODIES.index("torso_link"),
-  [BODIES.index(f"{s}_ankle_roll_link") for s in ("left", "right")],
-)
+TORSO = BODIES.index("torso_link")
+FEET = [BODIES.index(f"{s}_ankle_roll_link") for s in ("left", "right")]
 
 
 # The iLQR solver. The batch holds every (knot, perturbed coordinate) pair, so one step()
@@ -76,7 +72,7 @@ class Planner:
   """iLQR over a MuJoCo model. Subclasses supply cost(t, x, u) and expand(xs, us)."""
 
   def __init__(self, model, T, sub):
-    self.model, self.T, self.sub = model, T, sub
+    self.T, self.sub = T, sub
     self.nq, self.nv, self.nu = model.nq, model.nv, model.nu
     self.nx = 2 * self.nv
     self.lo, self.hi = model.actuator_ctrlrange.T
@@ -123,6 +119,9 @@ class Planner:
 
   def probe(self, n):
     pass
+
+  def cost(self, t, x, u):
+    raise NotImplementedError
 
   def advance(self, x, u):
     qpos, qvel, ctrl, warm = self.line_fields
@@ -196,13 +195,9 @@ def backward(A, B, lx, lxx, lu, luu, lo, hi, mu):
   return k[:-1], K
 
 
-def ilqr(planner, x0, us, xs=None, watch=lambda xs: None, iters=ITERS):
+def ilqr(planner, x0, us, xs, watch):
   T, nu, nx = planner.T, planner.nu, planner.nx
-  if xs is None:
-    xs, _, total = planner.rollout(x0, us)  # k=None: every sim replays us
-    xs, total = xs[:, 0], total[0]
-  else:
-    total = np.inf  # xs is a reference, not a rollout; accept the first step
+  total = np.inf  # accept the first step
   watch(xs)
 
   def derivatives():  # of the dynamics and the cost along xs, us, plus the control bounds
@@ -210,9 +205,9 @@ def ilqr(planner, x0, us, xs=None, watch=lambda xs: None, iters=ITERS):
 
   mu, K, d = 1.0, np.zeros((T, nu, nx)), derivatives()
   stop = False
-  for _ in range(iters):
+  for _ in range(ITERS):
     accepted = False
-    if (sweep := backward(*d, mu)) is not None:
+    if (sweep := backward(*d, mu=mu)) is not None:
       k, K = sweep
       new_xs, new_us, totals = planner.rollout(x0, us, (xs, k, K))
       best = int(np.argmin(totals))
@@ -233,20 +228,15 @@ def ilqr(planner, x0, us, xs=None, watch=lambda xs: None, iters=ITERS):
 
 def build_model():
   spec = mujoco.MjSpec.from_file(str(G1), assets=mm.get("unitree_g1").assets())
-  kind, obj = mujoco.mjtSensor, mujoco.mjtObj.mjOBJ_XBODY  # body frame, not the inertial frame
+  obj = mujoco.mjtObj.mjOBJ_XBODY  # body frame, not the inertial frame
   for body in BODIES:  # 13 sensor values per body: pos, quat, linvel, angvel
-    for name, sensor in (
-      ("pos", kind.mjSENS_FRAMEPOS),
-      ("quat", kind.mjSENS_FRAMEQUAT),
-      ("linvel", kind.mjSENS_FRAMELINVEL),
-      ("angvel", kind.mjSENS_FRAMEANGVEL),
-    ):
-      spec.add_sensor(name=f"{body}_{name}", type=sensor, objtype=obj, objname=body)
+    for name in ("pos", "quat", "linvel", "angvel"):
+      kind = getattr(mujoco.mjtSensor, f"mjSENS_FRAME{name.upper()}")
+      spec.add_sensor(name=f"{body}_{name}", type=kind, objtype=obj, objname=body)
   return spec.compile()
 
 
 def rotate(q, v):
-  """Rotate vectors v by quaternions q."""
   v = np.concatenate([np.zeros_like(v[..., :1]), v], axis=-1)
   return quat_mul(quat_mul(q, v), q * [1, -1, -1, -1])[..., 1:]
 
@@ -264,11 +254,10 @@ class Clip:
     self.qpos = np.concatenate([pos, quat, d["joint_pos"][:, keep]], axis=1)
     self.qvel = np.concatenate([d["body_lin_vel_w"][:, 0], spin, d["joint_vel"][:, keep]], axis=1)
     ids = [model.body(name).id - 1 for name in BODIES]  # the clip's body index skips the world body
-    quat = d["body_quat_w"][:, ids]
-    self.features = np.concatenate(  # same layout as the sensors
-      [d["body_pos_w"][:, ids] + [0, 0, LIFT], quat / np.linalg.norm(quat, axis=2, keepdims=True),
-       d["body_lin_vel_w"][:, ids], d["body_ang_vel_w"][:, ids]], axis=2,
-    )  # fmt: skip
+    pos, quat = d["body_pos_w"][:, ids] + [0, 0, LIFT], d["body_quat_w"][:, ids]
+    quat = quat / np.linalg.norm(quat, axis=2, keepdims=True)
+    lin, ang = d["body_lin_vel_w"][:, ids], d["body_ang_vel_w"][:, ids]
+    self.features = np.concatenate([pos, quat, lin, ang], axis=2)  # same layout as the sensors
 
 
 def warm_start(model, clip):
@@ -328,9 +317,9 @@ class Tracker(Planner):
     rot = quat_log(quat_mul(quat, ref[..., 3:7] * [1, -1, -1, -1]))
     rel = (pos - pos[..., :1, :]) - (ref[..., :3] - ref[..., :1, :3])
     root = pos[..., :1, :] - ref[..., :1, :3]
-    errors = [rel * np.sqrt(W_POS), root * np.sqrt(W_ROOT), rot * np.sqrt(W_ROT),
-              (vel[..., :3] - ref[..., 7:10]) * np.sqrt(W_VEL),
-              (vel[..., 3:] - ref[..., 10:]) * np.sqrt(W_ANG)]  # fmt: skip
+    lin, ang = vel[..., :3] - ref[..., 7:10], vel[..., 3:] - ref[..., 10:]
+    weighted = (rel, W_POS), (root, W_ROOT), (rot, W_ROT), (lin, W_VEL), (ang, W_ANG)
+    errors = [e * np.sqrt(w) for e, w in weighted]
     robust = np.concatenate(errors[:2], axis=-2)  # the position errors get the robust loss
     slope = 1 / np.sqrt(1 + (robust**2).sum(-1) / (W_POS * HUBER**2))
     return np.concatenate([e.reshape(*e.shape[:-2], -1) for e in errors], axis=-1), slope
@@ -376,19 +365,14 @@ def solve(tracker, x0, feedforward, watch=lambda xs, commit=0: None):
     shift = STEP if committed else 0  # drop the committed knots from the previous plan
     us = np.concatenate([us[shift:], held[at + len(us) - shift : at + length]])
     xs = tracker.rollout(x0, us)[0][:, 0]
-    xs, us, K, cost = ilqr(tracker, x0, us, xs=xs, iters=ITERS, watch=watch)
+    xs, us, K, cost = ilqr(tracker, x0, us, xs, watch)
     committed = length == HORIZON or at > 0
     n = min(STEP, length) if committed else 0
     watch(xs, commit=n)
     xs_all, us_all, K_all = xs_all + list(xs[1 : n + 1]), us_all + list(us[:n]), K_all + list(K[:n])
     x0 = xs[n]
-    progress(
-      f"knot {len(us_all):3d}/{T}",
-      (i + 1) / len(stages),
-      time.perf_counter() - start,
-      f"cost {cost:8.1f}  height {x0[2]:.2f}",
-      end=i + 1 == len(stages),
-    )
+    done, tail = (i + 1) / len(stages), f"cost {cost:8.1f}  height {x0[2]:.2f}"
+    progress(f"knot {len(us_all):3d}/{T}", done, time.perf_counter() - start, tail, end=done == 1)
   return np.array(xs_all), np.array(us_all), np.array(K_all)
 
 

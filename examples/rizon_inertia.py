@@ -194,8 +194,8 @@ def identify(model, inertia, observed, torque):
   fits, start = [(theta.copy(), np.sqrt(mse))], time.perf_counter()
   for it in range(ITERS + 1):
     last, rms = stop or it == ITERS, fits[-1][1]
-    progress(f"fit {len(fits) - 1:2d}/{ITERS}", 1.0 if last else (len(fits) - 1) / ITERS,
-             time.perf_counter() - start, f"data RMS {1000 * rms:.3f} mrad", end=last)  # fmt: skip
+    head, done = f"fit {len(fits) - 1:2d}/{ITERS}", 1.0 if last else (len(fits) - 1) / ITERS
+    progress(head, done, time.perf_counter() - start, f"data RMS {1000 * rms:.3f} mrad", end=last)
     if last:
       break
     jac = (r[:, 1:] - r[:, :1]) / EPS
@@ -220,7 +220,6 @@ def identify(model, inertia, observed, torque):
 
 
 def tip_path(model, states):
-  """Return the tip site's world position at every state, shape (len(states), 3)."""
   batch = Batch(model, len(states))
   batch.bind("qpos")[:] = states[:, :7]
   tip = batch.site("tip").xpos
@@ -276,11 +275,11 @@ def show(model, inertia, truth, observed, fits, held_out):
 
   def ellipsoids(scene):
     estimate = shapes(model, data, inertia.ids)
-    for group, color in ((actual, ACTUAL[:3] + (0.20,)), (estimate, ESTIMATE)):
+    for group, color in ((actual, (*ACTUAL[:3], 0.20)), (estimate, ESTIMATE)):
       for size, pos, mat in group:
         add_geom(scene, mujoco.mjtGeom.mjGEOM_ELLIPSOID, size, pos, mat, color)
     for circle in circles:
-      polyline(scene, circle, ACTUAL[:3] + (0.55,), 0.0015, CAPSULE)
+      polyline(scene, circle, (*ACTUAL[:3], 0.55), 0.0015, CAPSULE)
     for _, pos, _ in estimate:
       add_geom(scene, mujoco.mjtGeom.mjGEOM_SPHERE, np.full(3, 0.007), pos, np.eye(3).ravel(), PIN)
 
@@ -305,7 +304,7 @@ def show(model, inertia, truth, observed, fits, held_out):
     """Play a joint trajectory, with a second one behind it as a translucent ghost."""
     model.geom_matid[:], model.geom_rgba[:] = solid
     trail = tip_path(model, states)
-    behind = None if other is None else tip_path(model, other)
+    behind = trail if other is None else tip_path(model, other)
     for t in range(0, len(states), 2):
       if not window.open():
         return
@@ -315,7 +314,7 @@ def show(model, inertia, truth, observed, fits, held_out):
       if other is not None:
         ghost[1].qpos[:] = other[t, :7]
         mujoco.mj_forward(*ghost)
-        traces.append((behind[max(0, t - TRAIL) : t + 1], ACTUAL[:3] + (0.65,), 0.002))
+        traces.append((behind[max(0, t - TRAIL) : t + 1], (*ACTUAL[:3], 0.65), 0.002))
         ghosts = [ghost]
       window.draw(traces, ghosts, legend=legend)
       window.pace(2 * DT)
@@ -352,8 +351,7 @@ def main():
     guesses = np.stack([fits[0][0], fits[-1][0]])
     predicted = rollout(Batch(model, 2), inertia, guesses, unseen[:1], controls[:, None])[:, :, 0]
     rms = np.sqrt(np.mean((predicted - unseen[:, None, :7]) ** 2, axis=(0, 2)))
-    print(f"prediction: initial {rms[0]:.3e}, fitted {rms[1]:.3e} rad "
-          f"({rms[0] / rms[1]:.0f}x improvement)")  # fmt: skip
+    print(f"prediction: initial {rms[0]:.3e}, fitted {rms[1]:.3e} rad ({rms[0] / rms[1]:.0f}x improvement)")
     held_out = (predicted[:, 1], unseen) if args.predict else None
   if not args.headless:
     show(model, inertia, truth, observed, fits, held_out)

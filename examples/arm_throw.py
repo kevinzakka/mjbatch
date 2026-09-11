@@ -11,7 +11,7 @@ import mujoco
 import numpy as np
 
 from mjbatch import Batch
-from window import CAPSULE, CHOSEN, GHOST, Window, polyline, progress
+from window import CAPSULE, CHOSEN, GHOST, LINE, Window, polyline, progress
 
 ASSETS = Path(__file__).parent / "assets"
 DT, G, SOLVER = 0.002, 9.81, (40, 1e-10)  # s, m/s^2, solver iterations and tolerance
@@ -129,8 +129,8 @@ class Throws:
       self.batch.step(None if record else ~released)  # a released arm cannot change its throw
     distance, flight = landing(pos, vel)
     thrown = (vel[:, 0] > 0) & (self.warning.reshape(n, -1).sum(1) == 0)
-    return dict(score=np.where(thrown, distance, MISS), distance=distance, pos=pos, vel=vel,
-                flight=flight, path=np.asarray(path))  # fmt: skip
+    score = np.where(thrown, distance, MISS)
+    return dict(score=score, distance=distance, pos=pos, vel=vel, flight=flight, path=np.asarray(path))
 
 
 def search(pop, rng, label, fixed=False):
@@ -150,10 +150,9 @@ def search(pop, rng, label, fixed=False):
     std = np.maximum(std, 0.015 * (HIGH - LOW))  # never collapse onto the incumbent
     if score.max() > top:
       best, top = designs[score.argmax()].copy(), score.max()
-    history.append(best.copy())
-    done = (it + 1) / GENERATIONS
-    progress(f"{label} {it + 1:2d}/{GENERATIONS}", done, time.perf_counter() - start,
-             f"range {top:5.2f} m", end=it + 1 == GENERATIONS)  # fmt: skip
+    history.append(best)
+    head, done = f"{label} {it + 1:2d}/{GENERATIONS}", (it + 1) / GENERATIONS
+    progress(head, done, time.perf_counter() - start, f"range {top:5.2f} m", end=done == 1)
   return best, np.asarray(history)
 
 
@@ -191,9 +190,7 @@ def rule(scene, extent, distance, landed):
     y, end = LANES[i], int(np.ceil(extent))
     polyline(scene, np.array([[0, y, 0.008], [end, y, 0.008]]), (*color[:3], 0.35), 0.007)
     for x in range(1, end + 1):
-      polyline(
-        scene, np.array([[x, y - TICK, 0.009], [x, y + TICK, 0.009]]), (*color[:3], 0.8), 0.01
-      )
+      polyline(scene, np.array([[x, y - TICK, 0.009], [x, y + TICK, 0.009]]), (*color[:3], 0.8), 0.01)
     if landed[i]:
       x, angles = distance[i], np.linspace(0, 2 * np.pi, 49)
       polyline(scene, np.array([[x, y - 0.20, 0.012], [x, y + 0.20, 0.012]]), color, 0.022)
@@ -212,10 +209,10 @@ def main():
   results = Throws(2).run(designs, record=True)
   path, distance, flight = results["path"], results["distance"], results["flight"]
   shoulder, elbow = best[GEARS]
-  print(f"upper / lower {best[FRAC]:.2f} / {1 - best[FRAC]:.2f} m, gears {shoulder:.2f} at the "
-        f"shoulder and {elbow:.2f} at the elbow, release {best[RELEASE]:.3f} s")  # fmt: skip
-  print(f"stock {distance[0]:.2f} m, co-design {distance[1]:.2f} m: "
-        f"+{100 * (distance[1] / distance[0] - 1):.0f}%")  # fmt: skip
+  gears = f"gears {shoulder:.2f} at the shoulder and {elbow:.2f} at the elbow"
+  print(f"upper / lower {best[FRAC]:.2f} / {1 - best[FRAC]:.2f} m, {gears}, release {best[RELEASE]:.3f} s")
+  gain = 100 * (distance[1] / distance[0] - 1)
+  print(f"stock {distance[0]:.2f} m, co-design {distance[1]:.2f} m: +{gain:.0f}%")
   if args.headless:
     return
 
@@ -225,8 +222,7 @@ def main():
   window.option.flags[mujoco.mjtVisFlag.mjVIS_CONSTRAINT] = False
   arcs, down = tried(history), designs[:, RELEASE] + flight
   extent = max(3.0, float(distance.max()))
-  legend = ("stock\nco-design", "{:.2f} m\n{:.2f} m   (+{:.0f}%)".format(
-    *distance, 100 * (distance[1] / distance[0] - 1)))  # fmt: skip
+  legend = ("stock\nco-design", f"{distance[0]:.2f} m\n{distance[1]:.2f} m   (+{gain:.0f}%)")
   frame = 0
   try:
     while window.open():
@@ -240,7 +236,7 @@ def main():
       zoom = min(1.0, float(path[: index + 1, :, BALL][..., 0].max()) / extent)
       window.camera.distance = 4.4 + (max(5.0, 0.85 * extent + 1.0) - 4.4) * zoom
       window.camera.lookat[:] = [0.25 + (0.47 * extent - 0.25) * zoom, 0, 0.85 + 0.45 * zoom]
-      traces = [(arc, GHOST, 0.003) for arc in arcs] if zoom > 0.5 else []
+      traces = [(arc, GHOST, 0.003, LINE) for arc in arcs] if zoom > 0.5 else []
       for i, color in enumerate((COOL, CHOSEN)):
         points = path[: min(index, round(down[i] / DT)) + 1 : 5, i, BALL]
         if len(points) > 1:

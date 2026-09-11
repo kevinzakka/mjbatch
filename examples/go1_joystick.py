@@ -34,9 +34,7 @@ REWARD.update(orient=-5.0, bounce=-0.5, wobble=-0.05, limits=-1.0, rate=-0.01, l
 LEGS = np.array([3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8])
 LEG_SIGN = np.array([-1, 1, 1] * 4, np.float32)
 MIRROR = np.concatenate([np.arange(9), 9 + LEGS, 21 + LEGS, 33 + LEGS, np.arange(45, 50)])
-SIGN = np.concatenate(
-  [[1, -1, 1, -1, 1, -1, 1, -1, 1], *[LEG_SIGN] * 3, [1, -1, -1, -1, -1]], dtype=np.float32
-)
+SIGN = np.r_[[1, -1, 1, -1, 1, -1, 1, -1, 1], np.tile(LEG_SIGN, 3), [1, -1, -1, -1, -1]].astype(np.float32)
 SEED = 0
 GAMMA, LAMBDA, CLIP = 0.99, 0.95, 0.2
 LR, LR_END, LR_TO = 1e-3, 5e-4, 400
@@ -78,16 +76,14 @@ def build_model():
   for actuator in spec.actuators:
     actuator.set_to_position(kp=KP, kv=KD)
     actuator.ctrllimited = mujoco.mjtLimited.mjLIMITED_FALSE
-  kind, obj = mujoco.mjtSensor, mujoco.mjtObj
-  imu = dict(objtype=obj.mjOBJ_SITE, objname="imu")
-  spec.add_sensor(name="gyro", type=kind.mjSENS_GYRO, **imu)
-  spec.add_sensor(name="vel", type=kind.mjSENS_VELOCIMETER, **imu)
-  trunk = dict(objtype=obj.mjOBJ_XBODY, objname="world", reftype=obj.mjOBJ_XBODY)
-  spec.add_sensor(name="up", type=kind.mjSENS_FRAMEZAXIS, refname="trunk", **trunk)
+  kind, site, body = mujoco.mjtSensor, mujoco.mjtObj.mjOBJ_SITE, mujoco.mjtObj.mjOBJ_XBODY
+  spec.add_sensor(name="gyro", type=kind.mjSENS_GYRO, objtype=site, objname="imu")
+  spec.add_sensor(name="vel", type=kind.mjSENS_VELOCIMETER, objtype=site, objname="imu")
+  up = kind.mjSENS_FRAMEZAXIS  # the world's z axis in the trunk frame
+  spec.add_sensor(name="up", type=up, objtype=body, objname="world", reftype=body, refname="trunk")
   for foot in FEET:
-    site = dict(objtype=obj.mjOBJ_SITE, objname=foot)
-    spec.add_sensor(name=foot, type=kind.mjSENS_FRAMELINVEL, **site)
-    spec.add_sensor(name=foot + "_touch", type=kind.mjSENS_TOUCH, **site)
+    spec.add_sensor(name=foot, type=kind.mjSENS_FRAMELINVEL, objtype=site, objname=foot)
+    spec.add_sensor(name=foot + "_touch", type=kind.mjSENS_TOUCH, objtype=site, objname=foot)
   model = spec.compile()
   sun = model.light("sun").id
   model.light_poscom0[sun] = -6.0 * model.light_dir0[sun]
@@ -204,6 +200,10 @@ def mlp(out_dim):
 
 
 class ActorCritic(nn.Module):
+  mean: torch.Tensor
+  var: torch.Tensor
+  count: torch.Tensor
+
   def __init__(self):
     super().__init__()
     self.actor, self.critic = mlp(ACT_DIM), mlp(1)
@@ -314,15 +314,10 @@ def train():
       update(learner, opt, batch, *gae(batch))
       actor.load_state_dict(learner.state_dict())
       dt, milestone = time.perf_counter() - start, (it + 1) % 100 == 0 or it + 1 == ITERS
-      progress(
-        f"{it + 1:4d}/{ITERS}",
-        (it + 1) / ITERS,
-        dt,
-        f"{(it + 1) * HORIZON * NUM_ENVS / dt / 1e3:3.0f}k steps/s"
-        f"   reward {sum(REWARD[k] * stats[k] for k in REWARD):5.2f}"
-        f"  track {stats['track']:.2f}  turn {stats['turn']:.2f}  falls {stats['falls']:.2f}",
-        end=milestone,
-      )
+      reward = sum(REWARD[k] * stats[k] for k in REWARD)
+      tail = f"{(it + 1) * HORIZON * NUM_ENVS / dt / 1e3:3.0f}k steps/s   reward {reward:5.2f}  "
+      tail += "  ".join(f"{k} {stats[k]:.2f}" for k in ("track", "turn", "falls"))
+      progress(f"{it + 1:4d}/{ITERS}", (it + 1) / ITERS, dt, tail, end=milestone)
       if milestone:
         print(" " * 9 + "  ".join(f"{k} {REWARD[k] * stats[k]:.2f}" for k in REWARD))
       if (it + 1) % 25 == 0 or milestone:  # often, so --play can follow along
