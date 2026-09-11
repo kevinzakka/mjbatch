@@ -426,8 +426,11 @@ class Batch {
     if (a.dtype() != nb::dtype<mjtNum>()) {
       throw nb::value_error((std::string("history must be ") + DtypeName(Elem::Num)).c_str());
     }
-    if (a.device_type() != nb::device::cpu::value || a.stride(2) != 1 || a.stride(1) != nstate_ ||
-        a.stride(0) != static_cast<int64_t>(nstep) * nstate_) {
+    // A size-0 array (an empty selection) is never written, so its strides are
+    // irrelevant; numpy sets them all to zero regardless of contiguity.
+    if (a.device_type() != nb::device::cpu::value ||
+        (a.size() != 0 && (a.stride(2) != 1 || a.stride(1) != nstate_ ||
+                           a.stride(0) != static_cast<int64_t>(nstep) * nstate_))) {
       throw nb::value_error("history must be a C-contiguous CPU array");
     }
     return static_cast<mjtNum*>(a.data());

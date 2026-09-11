@@ -297,6 +297,15 @@ def test_step_history_validation(model):
   assert not np.any(batch.bind("time"))
 
 
+def test_step_history_allows_an_empty_selection(model):
+  # A size-0 history has nothing written to it, so its strides are irrelevant
+  # (numpy sets them to zero); it must not be rejected as non-contiguous.
+  batch = Batch(model, N)
+  batch.step(np.zeros(N, dtype=bool), nstep=3, history=np.empty((0, 3, batch.nstate)))
+  batch.step(np.array([], dtype=np.int64), nstep=2, history=np.empty((0, 2, batch.nstate)))
+  assert not np.any(batch.bind("time"))
+
+
 def test_step_history_error_names_the_sim():
   batch = Batch(mujoco.MjModel.from_xml_string(LOCKSTEP_XML), N, num_threads=2)
   batch.expand("eq_type")[2] = 99
