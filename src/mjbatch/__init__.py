@@ -39,7 +39,10 @@ class Site:
 
 class Batch(_Batch):
   """See mjbatch._bindings.Batch. The named accessors return live (N, ...) views of
-  the corresponding bound fields, like MjData's sensor(), joint(), body() and site()."""
+  the corresponding bound fields, like MjData's sensor(), joint(), body() and site().
+
+  model is the template, for names, ids and sizes. The batch copied it at construction,
+  so writes to it do not reach the simulations; expand() a field to change it per sim."""
 
   def __init__(
     self,

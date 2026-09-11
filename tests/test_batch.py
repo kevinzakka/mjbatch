@@ -406,6 +406,10 @@ def test_shapes_and_dtypes_match_mjdata(model):
     batch.bind("eq_active", np.float32)
   with pytest.raises(ValueError):
     batch.bind("nope")
+  with pytest.raises(ValueError, match=r'use expand\("geom_friction"\)'):
+    batch.bind("geom_friction")
+  with pytest.raises(ValueError, match=r'use bind\("qpos"\)'):
+    batch.expand("qpos")
   with pytest.raises(ValueError):
     batch.expand("mesh_vert")
   with pytest.raises(ValueError):

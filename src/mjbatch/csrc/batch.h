@@ -363,7 +363,15 @@ class Batch {
  private:
   const FieldInfo& Field(const FieldTable& table, const std::string& name) {
     auto it = table.find(name);
-    if (it == table.end()) throw nb::value_error(("unknown field " + name).c_str());
+    if (it == table.end()) {
+      std::string msg = "unknown field " + name;
+      if (&table == &data_fields_ && model_fields_.count(name)) {
+        msg = name + " is an mjModel field; use expand(\"" + name + "\")";
+      } else if (&table == &model_fields_ && data_fields_.count(name)) {
+        msg = name + " is an mjData field; use bind(\"" + name + "\")";
+      }
+      throw nb::value_error(msg.c_str());
+    }
     if (it->second.elem == Elem::Other) {
       throw nb::value_error(("unsupported element type in " + name).c_str());
     }
