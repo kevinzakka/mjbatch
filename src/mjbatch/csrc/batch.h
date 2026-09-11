@@ -66,6 +66,17 @@ inline const char* DtypeName(Elem e) {
   }
 }
 
+// numpy's rule: an extent-1 axis may carry any stride and a size-0 array is contiguous.
+inline bool IsCContig(const nb::ndarray<>& a) {
+  if (a.size() == 0) return true;
+  int64_t expect = 1;
+  for (size_t i = a.ndim(); i-- > 0;) {
+    if (a.shape(i) != 1 && a.stride(i) != expect) return false;
+    expect *= static_cast<int64_t>(a.shape(i));
+  }
+  return true;
+}
+
 // One array field of mjModel or mjData, sized for a specific model.
 struct FieldInfo {
   const char* name;
@@ -426,8 +437,7 @@ class Batch {
     if (a.dtype() != nb::dtype<mjtNum>()) {
       throw nb::value_error((std::string("history must be ") + DtypeName(Elem::Num)).c_str());
     }
-    if (a.device_type() != nb::device::cpu::value || a.stride(2) != 1 || a.stride(1) != nstate_ ||
-        a.stride(0) != static_cast<int64_t>(nstep) * nstate_) {
+    if (a.device_type() != nb::device::cpu::value || !IsCContig(a)) {
       throw nb::value_error("history must be a C-contiguous CPU array");
     }
     return static_cast<mjtNum*>(a.data());
