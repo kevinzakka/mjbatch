@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=1.0", "nanobind>=2.2.0", "mujoco==3.11.0"]
+requires = ["scikit-build-core>=1.0", "nanobind>=2.2.0", "mujoco==3.13.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 requires-python = ">=3.10"
-dependencies = ["mujoco==3.11.0", "numpy"]
+dependencies = ["mujoco==3.13.0", "numpy"]
 
 [project.urls]
 Homepage = "https://github.com/kevinzakka/mjbatch"
@@ -84,10 +84,10 @@ test-requires = "pytest"
 test-command = "pytest {project}/tests"
 
 [tool.cibuildwheel.linux]
-repair-wheel-command = "auditwheel repair --exclude libmujoco.so.3.11.0 -w {dest_dir} {wheel}"
+repair-wheel-command = "auditwheel repair --exclude 'libmujoco.so.*' -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.macos]
-repair-wheel-command = "delocate-wheel --ignore-missing-dependencies --exclude libmujoco.3.11.0.dylib --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+repair-wheel-command = "delocate-wheel --ignore-missing-dependencies --exclude libmujoco --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
 
 [tool.uv.sources]
 # CUDA wheels built against the 12.8 driver on the Linux boxes; PyPI's default torch
