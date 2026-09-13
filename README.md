@@ -26,6 +26,17 @@ for _ in range(1000):
   batch.step()                       # step them in parallel; qpos updates in place
 ```
 
+## Installation
+
+```
+pip install mjbatch
+```
+
+Each wheel is built for one MuJoCo release, 3.10 through 3.13, and its version says which:
+`0.1.0.post31300` is `mjbatch` 0.1.0 for MuJoCo 3.13.0. A plain install takes the newest; with
+`mujoco` pinned, the resolver takes the matching one. A source build pairs with `MUJOCO_VERSION`,
+default 3.13.0.
+
 ## Examples
 
 We showcase a range of applications built using `mjbatch`: RL, MPC, SysID, and hardware
