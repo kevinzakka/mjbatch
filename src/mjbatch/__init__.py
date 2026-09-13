@@ -1,12 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass
+from importlib.metadata import requires, version
 from typing import Any
 
 import mujoco
 import numpy as np
 
-from mjbatch._bindings import Batch as _Batch
+try:
+  from mjbatch._bindings import Batch as _Batch
+except ImportError:
+  _built = next(r.removeprefix("mujoco==") for r in requires("mjbatch") or [] if r.startswith("mujoco=="))
+  if _built == mujoco.__version__:
+    raise
+  _tag = "{}{:02d}{:02d}".format(*map(int, mujoco.__version__.split(".")[:3]))
+  raise ImportError(
+    f"mjbatch {version('mjbatch')} was built for MuJoCo {_built} but {mujoco.__version__} is installed; "
+    f"install mjbatch=={version('mjbatch').split('.post')[0]}.post{_tag} or mujoco=={_built}"
+  ) from None
 
 _QPOS_WIDTH = {0: 7, 1: 4, 2: 1, 3: 1}  # by mjtJoint: free, ball, slide, hinge
 _DOF_WIDTH = {0: 6, 1: 3, 2: 1, 3: 1}

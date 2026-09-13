@@ -228,16 +228,24 @@ inline void CopyChanged(void* dst, const uint8_t* buf, const uint8_t* mirror, co
 // mjModel scalars mj_setConst writes; kept per sim like expanded fields.
 struct Scalars {
   mjtSize ngravcomp;
+#if mjVERSION_HEADER >= 3011000
   mjtBool flg_gravcomp, flg_surfacevel, flg_adhesion;
+#endif
   mjStatistic stat;
   static Scalars Of(const mjModel* m) {
+#if mjVERSION_HEADER >= 3011000
     return {m->ngravcomp, m->flg_gravcomp, m->flg_surfacevel, m->flg_adhesion, m->stat};
+#else
+    return {m->ngravcomp, m->stat};
+#endif
   }
   void Apply(mjModel* m) const {
     m->ngravcomp = ngravcomp;
+#if mjVERSION_HEADER >= 3011000
     m->flg_gravcomp = flg_gravcomp;
     m->flg_surfacevel = flg_surfacevel;
     m->flg_adhesion = flg_adhesion;
+#endif
     m->stat = stat;
   }
 };
@@ -470,8 +478,10 @@ class Batch {
 
   void Restore(mjModel* m) {
     for (const FieldInfo* f : restorable_) std::memcpy(f->get(m), f->get(template_), f->bytes());
+#if mjVERSION_HEADER >= 3011000
     m->npolygonmax = template_->npolygonmax;
     m->nmeshdegmax = template_->nmeshdegmax;
+#endif
     Scalars::Of(template_).Apply(m);
   }
 
