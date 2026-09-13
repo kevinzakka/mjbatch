@@ -73,6 +73,7 @@ extra-paths = ["typings"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["examples"]
 
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-* cp314t-*"
