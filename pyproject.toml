@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "mjbatch"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Python library for running thousands of MuJoCo simulations in parallel on CPU."
 readme = "README.md"
 license = "Apache-2.0"
