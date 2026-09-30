@@ -80,7 +80,6 @@ build = "cp310-* cp311-* cp312-* cp313-* cp314-* cp314t-*"
 # Windows: the mujoco wheel ships mujoco.dll with no import library, and the
 # extension finds libmujoco by rpath, which Windows has no equivalent of.
 skip = "*-musllinux_* *-win* *_i686"
-enable = ["cpython-freethreading"]
 test-requires = "pytest"
 test-command = "pytest {project}/tests"
 
