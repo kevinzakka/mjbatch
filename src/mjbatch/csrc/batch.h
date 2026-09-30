@@ -25,6 +25,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "threadpool.h"
@@ -99,6 +100,29 @@ inline bool IsInput(std::string_view name) {
     if (name == s) return true;
   }
   return false;
+}
+
+// The mjtState component a data field is stored as, or 0.
+inline int StateBit(std::string_view name) {
+  static constexpr std::pair<std::string_view, int> bits[] = {
+      {"time", mjSTATE_TIME},
+      {"qpos", mjSTATE_QPOS},
+      {"qvel", mjSTATE_QVEL},
+      {"act", mjSTATE_ACT},
+      {"history", mjSTATE_HISTORY},
+      {"qacc_warmstart", mjSTATE_WARMSTART},
+      {"ctrl", mjSTATE_CTRL},
+      {"qfrc_applied", mjSTATE_QFRC_APPLIED},
+      {"xfrc_applied", mjSTATE_XFRC_APPLIED},
+      {"eq_active", mjSTATE_EQ_ACTIVE},
+      {"mocap_pos", mjSTATE_MOCAP_POS},
+      {"mocap_quat", mjSTATE_MOCAP_QUAT},
+      {"userdata", mjSTATE_USERDATA},
+      {"plugin_state", mjSTATE_PLUGIN}};
+  for (auto [n, bit] : bits) {
+    if (name == n) return bit;
+  }
+  return 0;
 }
 
 inline bool IsAsset(std::string_view name) {
@@ -186,6 +210,7 @@ struct Slot {
   size_t row;  // bytes per sim
   std::unique_ptr<uint8_t[]> buf;
   std::unique_ptr<uint8_t[]> mirror;  // buf as last written by us; input data fields only
+  int offset = -1;  // into each state row when the view is the state itself (no buf)
 };
 
 inline void ToBuf(uint8_t* dst, const void* src, const Slot& s) {
@@ -278,10 +303,12 @@ class Batch {
     for (int t = 0; t < pool_->size(); ++t) data_.push_back(mj_makeData(template_));
     nstate_ = mj_stateSize(template_, mjSTATE_INTEGRATION);
     states_.resize(static_cast<size_t>(num_sims) * nstate_);
+    written_.resize(states_.size());
     warnings_.resize(static_cast<size_t>(num_sims) * mjNWARNING);
     for (int i = 0; i < num_sims; ++i) {
       mj_getState(template_, data_[0], State(i), mjSTATE_INTEGRATION);
     }
+    written_ = states_;
   }
 
   ~Batch() {
@@ -311,6 +338,19 @@ class Batch {
     bool f32 = ParseDtype(f, dtype);
     for (auto& s : bound_) {
       if (s->info == &f) return Matching(*s, f32);
+    }
+    // An mjtNum state component is a strided view into the state rows, so a
+    // write through either lands in the same place and none can go stale.
+    if (int bit = StateBit(f.name); bit && f.elem == Elem::Num && !f32) {
+      auto s = std::make_unique<Slot>();
+      s->info = &f;
+      s->f32 = false;
+      s->offset = mj_stateSize(template_, mjSTATE_INTEGRATION & (bit - 1));
+      if (mj_stateSize(template_, bit) != f.nr * f.nc) {
+        throw std::runtime_error(std::string(f.name) + " does not match its state component");
+      }
+      bound_.push_back(std::move(s));
+      return View(*bound_.back());
     }
     bound_.push_back(MakeSlot(f, f32, f.input));
     // A derived field stays zero until the next call fills it.
@@ -447,6 +487,11 @@ class Batch {
     const FieldInfo& f = *s.info;
     size_t shape[3] = {static_cast<size_t>(num_sims_), static_cast<size_t>(f.nr),
                        static_cast<size_t>(f.nc)};
+    if (s.offset >= 0) {
+      int64_t strides[3] = {nstate_, f.ndim == 2 ? f.nc : 1, 1};
+      return nb::ndarray<nb::numpy>(states_.data() + s.offset, f.ndim + 1, shape, nb::find(this),
+                                    strides, nb::dtype<mjtNum>());
+    }
     nb::dlpack::dtype dt;
     if (s.f32 || f.elem == Elem::Float) {
       dt = nb::dtype<float>();
@@ -463,6 +508,7 @@ class Batch {
   }
 
   void CopyOut(Slot& s, mjData* d, int i) {
+    if (s.offset >= 0) return;  // the state row itself
     uint8_t* row = s.buf.get() + i * s.row;
     ToBuf(row, s.info->get(d), s);
     if (s.mirror) std::memcpy(s.mirror.get() + i * s.row, row, s.row);
@@ -476,6 +522,7 @@ class Batch {
   }
 
   mjtNum* State(int i) { return states_.data() + static_cast<size_t>(i) * nstate_; }
+  mjtNum* Written(int i) { return written_.data() + static_cast<size_t>(i) * nstate_; }
   mjWarningStat* Warning(int i) { return warnings_.data() + static_cast<size_t>(i) * mjNWARNING; }
 
   void RunSim(int t, int i, Op op, int arg, mjtNum* hist) {
@@ -502,6 +549,20 @@ class Batch {
         mj_resetDataKeyframe(m, d, arg);
       } else {
         mj_resetData(m, d);
+      }
+      // Pending writes to the state row, through it or an aliasing field view, land
+      // on top of the reset element by element, like pending field writes below.
+      const mjtNum* row = State(i);
+      const mjtNum* last = Written(i);
+      if (std::memcmp(row, last, nstate_ * sizeof(mjtNum)) != 0) {
+        mj_markStack(d);
+        mjtNum* merged = mj_stackAllocNum(d, nstate_);
+        mj_getState(m, d, merged, mjSTATE_INTEGRATION);
+        for (int k = 0; k < nstate_; ++k) {
+          if (std::memcmp(row + k, last + k, sizeof(mjtNum)) != 0) merged[k] = row[k];
+        }
+        mj_setState(m, d, merged, mjSTATE_INTEGRATION);
+        mj_freeStack(d);
       }
     } else {
       mj_setState(m, d, State(i), mjSTATE_INTEGRATION);
@@ -530,6 +591,7 @@ class Batch {
         break;
     }
     mj_getState(m, d, State(i), mjSTATE_INTEGRATION);
+    std::memcpy(Written(i), State(i), nstate_ * sizeof(mjtNum));
     std::memcpy(Warning(i), d->warning, sizeof(d->warning));
     for (auto& s : bound_) CopyOut(*s, d, i);
   }
@@ -623,6 +685,7 @@ class Batch {
   std::vector<mjModel*> models_;  // per worker, once anything is expanded
   int nstate_;
   std::vector<mjtNum> states_;           // per sim, mjSTATE_INTEGRATION
+  std::vector<mjtNum> written_;          // states_ as last written by us, for reset
   std::vector<mjWarningStat> warnings_;  // per sim
   std::vector<Scalars> scalars_;         // per sim
   std::vector<std::unique_ptr<Slot>> bound_;

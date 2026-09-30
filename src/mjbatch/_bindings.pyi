@@ -17,19 +17,23 @@ class Batch:
     bind("state") returns the (N, nstate) integration states themselves, in
     mj_getState's mjSTATE_INTEGRATION order: opaque rows for copying, saving and
     restoring simulations, native dtype only. A row written is the simulation's
-    state at its next call, with pending field writes applied on top; the field
-    views are stale until then. reset discards it, as it discards a field write.
+    state at its next call, with pending writes to copied fields (below) applied on
+    top. reset applies it element by element where it changed, like a field write.
 
     bind(field) returns an (N, ...) array over an mjData field in MjData's layout.
-    Input fields (the mjtState components and warning) are copied in before
-    a physics call, element by element, where they changed since we last wrote
-    them; every bound field is copied out after, and a derived field bound between
-    calls is filled for a simulation by its next call. reset applies pending writes
-    after mj_resetData and then runs mj_forward, so derived fields are valid. After
-    step, sensordata and every derived field are one substep behind qpos and qvel,
-    as with mj_step itself, unless the batch was made with forward=True, which ends
-    every step with mj_forward so they are current, at the cost of one forward per
-    simulation per call.
+    An mjtNum state component bound in its native dtype (qpos, qvel, ctrl,
+    mocap_pos, ...) is a strided view into the state rows, so a write through it and
+    a write to the row are one write, the later winning. The other input fields
+    (eq_active, warning, and float32 bindings) are copies, copied in before a
+    physics call, element by element, where they changed since we last wrote them;
+    after a state write they are stale until the next call, and a write of the
+    stale value goes unseen. Every bound field is copied out after a call, and a
+    derived field bound between calls is filled for a simulation by its next call.
+    reset applies pending writes after mj_resetData and then runs mj_forward, so
+    derived fields are valid. After step, sensordata and every derived field are
+    one substep behind qpos and qvel, as with mj_step itself, unless the batch was
+    made with forward=True, which ends every step with mj_forward so they are
+    current, at the cost of one forward per simulation per call.
 
     expand(field) returns (N, ...) per-simulation values of an mjModel field, seeded
     from the model and applied before every physics call for that simulation.

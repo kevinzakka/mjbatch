@@ -626,10 +626,90 @@ def test_state_rows_copy_restore_and_compose(model):
   state[:] = before
   batch.step(nstep=2)
   np.testing.assert_array_equal(state, once)
-  # reset discards a pending state write; float32 is refused; the view is the same.
+  # reset applies a pending state write element by element, like a field write;
+  # float32 is refused; the view is the same.
   state[2] = once[5]
+  merged = mujoco.MjData(model)
+  reset = np.empty(batch.nstate)
+  mujoco.mj_getState(model, merged, reset, mujoco.mjtState.mjSTATE_INTEGRATION)
+  written = np.where(once[5] != once[2], once[5], reset)
+  mujoco.mj_setState(model, merged, written, mujoco.mjtState.mjSTATE_INTEGRATION)
   batch.reset(np.array([2]))
-  np.testing.assert_array_equal(qpos[2], 0.0)
+  np.testing.assert_array_equal(qpos[2], merged.qpos)
+  np.testing.assert_array_equal(state[2], written)
   with pytest.raises(ValueError):
     batch.bind("state", np.float32)
   assert np.shares_memory(batch.bind("state"), state)
+
+
+SLIDER_XML = """
+<mujoco>
+  <option gravity="0 0 0"/>
+  <worldbody>
+    <body><joint name="j" type="slide"/><geom size=".1" mass="1"/></body>
+    <body name="mocap" mocap="true"><geom size=".02" contype="0" conaffinity="0"/></body>
+  </worldbody>
+  <actuator><motor joint="j"/></actuator>
+</mujoco>
+"""
+
+
+def slider(num_sims):
+  model = mujoco.MjModel.from_xml_string(SLIDER_XML)
+  s0 = np.empty(mujoco.mj_stateSize(model, mujoco.mjtState.mjSTATE_INTEGRATION))
+  mujoco.mj_getState(model, mujoco.MjData(model), s0, mujoco.mjtState.mjSTATE_INTEGRATION)
+  return model, Batch(model, num_sims), s0
+
+
+def test_field_write_after_state_write_reaches_the_sim():
+  _, batch, s0 = slider(1)
+  ctrl, state, qvel = batch.bind("ctrl"), batch.bind("state"), batch.bind("qvel")
+  ctrl[:] = 1.0
+  batch.step()
+  assert qvel[0, 0] == 0.002
+  state[:] = s0  # ctrl 0, and the ctrl view says so at once: it is the state row
+  assert ctrl[0, 0] == 0.0 and np.shares_memory(ctrl, state)
+  ctrl[:] = 1.0  # the value the view held before the state write
+  batch.step()
+  assert qvel[0, 0] == 0.002
+
+
+def test_mocap_write_after_state_write_reaches_the_sim():
+  model, batch, s0 = slider(1)
+  mocap_pos, state, xpos = batch.bind("mocap_pos"), batch.bind("state"), batch.bind("xpos")
+  body = model.body("mocap").id
+  mocap_pos[0, 0] = [0.3, 0.2, 0.1]
+  batch.forward()
+  np.testing.assert_array_equal(xpos[0, body], [0.3, 0.2, 0.1])
+  state[:] = s0
+  mocap_pos[0, 0] = [0.3, 0.2, 0.1]
+  batch.forward()
+  np.testing.assert_array_equal(xpos[0, body], [0.3, 0.2, 0.1])
+
+
+def test_field_write_after_state_write_with_ids():
+  _, batch, s0 = slider(3)
+  ctrl, state, qvel = batch.bind("ctrl"), batch.bind("state"), batch.bind("qvel")
+  ctrl[:] = 1.0
+  batch.step()
+  state[:] = s0
+  ctrl[:] = 1.0
+  batch.step(np.array([0, 2]))
+  np.testing.assert_array_equal(qvel[:, 0], [0.002, 0.0, 0.002])
+  batch.step(np.array([1]))  # sim 1's writes waited for its next call
+  np.testing.assert_array_equal(qvel[:, 0], [0.002, 0.002, 0.002])
+
+
+def test_state_write_wins_over_unwritten_fields():
+  model, batch, s0 = slider(2)
+  ctrl, mocap_pos, state = batch.bind("ctrl"), batch.bind("mocap_pos"), batch.bind("state")
+  qvel, xpos = batch.bind("qvel"), batch.bind("xpos")
+  ctrl[:] = 1.0
+  mocap_pos[:, 0] = [0.3, 0.2, 0.1]
+  batch.step()
+  state[1] = s0
+  batch.step()
+  np.testing.assert_array_equal(qvel[:, 0], [0.004, 0.0])
+  np.testing.assert_array_equal(ctrl[:, 0], [1.0, 0.0])
+  np.testing.assert_array_equal(mocap_pos[1, 0], 0.0)
+  np.testing.assert_array_equal(xpos[1, model.body("mocap").id], 0.0)
