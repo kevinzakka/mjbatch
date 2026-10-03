@@ -1,0 +1,50 @@
+<mujoco model="cricket contact sweep">
+  <compiler angle="radian"/>
+  <option timestep=".00025" integrator="implicitfast" cone="elliptic" iterations="50"/>
+  <default>
+    <geom contype="2" conaffinity="1" friction=".35 .005 .0001" solref=".004 .5"/>
+    <site rgba="0 0 0 0"/>
+  </default>
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+    <headlight ambient=".4 .4 .4" diffuse=".6 .6 .6"/>
+  </visual>
+  <worldbody>
+    <light pos="-4 -3 8" dir=".3 .2 -1" directional="true"/>
+    <geom name="pitch" type="plane" size="20 8 .1" rgba=".18 .36 .24 1"/>
+    <geom type="box" pos="-1.22 0 .001" size=".015 1.3 .001" rgba=".95 .95 .95 1"
+          contype="0" conaffinity="0"/>
+    <site name="pitch_touch" type="box" pos="-7 0 0" size="20 8 .01"/>
+    <body name="bat" pos="-.55 0 1.05" gravcomp="1">
+      <joint name="swing" type="hinge" axis="0 1 0" range="-1.4 1.4" damping=".15"
+             solreflimit=".004 1"/>
+      <geom name="handle" type="capsule" fromto="0 0 0 0 0 -.30" size=".016" mass=".15"
+            contype="0" conaffinity="0" rgba=".18 .20 .23 1"/>
+      <geom name="blade" type="box" pos="0 0 -.60" size=".025 .054 .30" mass="1.05"
+            rgba=".85 .7 .4 1"/>
+      <site name="bat_touch" type="box" pos="0 0 -.60" size=".026 .055 .301"/>
+    </body>
+    <body name="stumps">
+      <geom name="stump_left" type="capsule" fromto="0 -.09 .025 0 -.09 .686" size=".025"
+            rgba=".9 .87 .7 1"/>
+      <geom name="stump_middle" type="capsule" fromto="0 0 .025 0 0 .686" size=".025"
+            rgba=".9 .87 .7 1"/>
+      <geom name="stump_right" type="capsule" fromto="0 .09 .025 0 .09 .686" size=".025"
+            rgba=".9 .87 .7 1"/>
+      <site name="stumps_touch" type="box" pos="0 0 .356" size=".03 .12 .357"/>
+    </body>
+    <body name="ball" pos="-14 0 1.8">
+      <freejoint name="flight"/>
+      <geom name="ball" type="sphere" size=".036" mass=".156" contype="1" conaffinity="2"
+            rgba=".82 .10 .13 1"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <position joint="swing" kp="120" kv="8" ctrlrange="-1.3 1.3" forcerange="-60 60"/>
+  </actuator>
+  <sensor>
+    <touch name="pitch" site="pitch_touch"/>
+    <touch name="bat" site="bat_touch"/>
+    <touch name="stumps" site="stumps_touch"/>
+  </sensor>
+</mujoco>

@@ -74,6 +74,17 @@ RL controller learns to walk in under a minute on a five-year-old M1 laptop.
 Run with `uv run examples/<file>.py`; some need `uv sync --group examples`. The ones that open
 a window need a display; `--headless` runs the solver without one.
 
+### Cricket Contact Sweeps
+
+[![Batched cricket batting and bowling-release sweeps](examples/assets/cricket.gif)](examples/cricket.py)
+
+[`cricket.py`](examples/cricket.py) sweeps bat-swing timing and bowling-release
+velocity through native ball/pitch/bat/stump contacts on CPU. Run
+`uv run examples/cricket.py --task batting` or `--task bowling`; add `--headless`
+for all-candidate contact counts without a window. The preview shows selected
+parameter-sweep candidates, not RL policies or a full humanoid simulation.
+See the [model assumptions, tests and timestep sensitivity](examples/cricket.md).
+
 ## License
 
 Apache-2.0.
