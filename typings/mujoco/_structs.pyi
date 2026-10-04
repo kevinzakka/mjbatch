@@ -137,7 +137,7 @@ class MjContact:
     def vert(self, arg1: typing.Any) -> None:
         ...
 class MjData:
-    _all_fields: typing.ClassVar[tuple] = ('narena', 'nbuffer', 'nplugin', 'pstack', 'pbase', 'parena', 'threadpool', 'maxuse_stack', 'maxuse_arena', 'maxuse_con', 'maxuse_efc', 'ncon', 'ne', 'nf', 'nl', 'nefc', 'nJ', 'efm_active', 'nefmK', 'nefmcon', 'nefmT', 'nefmA', 'nefmdof', 'nefmL', 'nY', 'nA', 'nisland', 'nidof', 'ntree_awake', 'nbody_awake', 'nparent_awake', 'nv_awake', 'flg_energypos', 'flg_energyvel', 'flg_subtreevel', 'flg_rnepost', 'time', 'solver', 'solver_niter', 'solver_nnz', 'solver_fwdinv', 'warning', 'timer', 'energy', 'qpos', 'qvel', 'act', 'history', 'qacc_warmstart', 'plugin_state', 'ctrl', 'qfrc_applied', 'xfrc_applied', 'eq_active', 'mocap_pos', 'mocap_quat', 'qacc', 'act_dot', 'userdata', 'sensordata', 'tree_asleep', 'plugin', 'plugin_data', 'xpos', 'xquat', 'xmat', 'xipos', 'ximat', 'xanchor', 'xaxis', 'geom_xpos', 'geom_xmat', 'site_xpos', 'site_xmat', 'cam_xpos', 'cam_xmat', 'light_xpos', 'light_xdir', 'subtree_com', 'cdof', 'cinert', 'flexvert_xpos', 'flexelem_aabb', 'flexelem_krot', 'flexedge_J', 'flexedge_length', 'flexvert_J', 'flexvert_length', 'bvh_aabb_dyn', 'ten_wrapadr', 'ten_wrapnum', 'ten_J', 'ten_length', 'wrap_obj', 'wrap_xpos', 'actuator_length', 'moment_rownnz', 'moment_rowadr', 'moment_colind', 'actuator_moment', 'crb', 'M', 'qLD', 'qLDiagInv', 'bvh_active', 'tree_awake', 'body_awake', 'body_awake_ind', 'parent_awake_ind', 'dof_awake_ind', 'flexedge_velocity', 'ten_velocity', 'actuator_velocity', 'cvel', 'cdof_dot', 'qfrc_bias', 'qfrc_spring', 'qfrc_damper', 'qfrc_gravcomp', 'qfrc_fluid', 'qfrc_adhesion', 'qfrc_passive', 'subtree_linvel', 'subtree_angmom', 'qH', 'qHDiagInv', 'qDeriv', 'qLU', 'actuator_force', 'qfrc_actuator', 'qfrc_smooth', 'qacc_smooth', 'qfrc_constraint', 'qfrc_inverse', 'cacc', 'cfrc_int', 'cfrc_ext')
+    _all_fields: typing.ClassVar[tuple] = ('narena', 'nbuffer', 'nplugin', 'pstack', 'pbase', 'parena', 'threadpool', 'maxuse_stack', 'maxuse_arena', 'maxuse_con', 'maxuse_efc', 'ncon', 'ne', 'nf', 'nl', 'nefc', 'nJ', 'efm_active', 'nefmK', 'nefmcon', 'nefmT', 'nefmA', 'nefmdof', 'nefmL', 'nY', 'nA', 'nisland', 'nidof', 'ntree_awake', 'nbody_awake', 'nparent_awake', 'nv_awake', 'flg_energypos', 'flg_energyvel', 'flg_subtreevel', 'flg_rnepost', 'time', 'solver', 'solver_niter', 'solver_nnz', 'solver_fwdinv', 'warning', 'timer', 'energy', 'qpos', 'qvel', 'act', 'history', 'qacc_warmstart', 'plugin_state', 'ctrl', 'qfrc_applied', 'xfrc_applied', 'eq_active', 'mocap_pos', 'mocap_quat', 'qacc', 'act_dot', 'userdata', 'sensordata', 'tree_asleep', 'plugin', 'plugin_data', 'xpos', 'xquat', 'xmat', 'xipos', 'ximat', 'xanchor', 'xaxis', 'geom_xpos', 'geom_xmat', 'site_xpos', 'site_xmat', 'cam_xpos', 'cam_xmat', 'light_xpos', 'light_xdir', 'subtree_com', 'cdof', 'cinert', 'flexvert_xpos', 'flexelem_aabb', 'flexelem_krot', 'flexedge_J', 'flexedge_length', 'flexvert_J', 'flexvert_length', 'bvh_aabb_dyn', 'flexvert_lambda', 'flexvert_conage', 'ten_wrapadr', 'ten_wrapnum', 'ten_J', 'ten_length', 'wrap_obj', 'wrap_xpos', 'actuator_length', 'moment_rownnz', 'moment_rowadr', 'moment_colind', 'actuator_moment', 'crb', 'M', 'qLD', 'qLDiagInv', 'bvh_active', 'tree_awake', 'body_awake', 'body_awake_ind', 'parent_awake_ind', 'dof_awake_ind', 'flexedge_velocity', 'ten_velocity', 'actuator_velocity', 'cvel', 'cdof_dot', 'qfrc_bias', 'qfrc_spring', 'qfrc_damper', 'qfrc_gravcomp', 'qfrc_fluid', 'qfrc_adhesion', 'qfrc_passive', 'subtree_linvel', 'subtree_angmom', 'qH', 'qHDiagInv', 'qDeriv', 'qLU', 'actuator_force', 'qfrc_actuator', 'qfrc_smooth', 'qacc_smooth', 'qfrc_constraint', 'qfrc_inverse', 'cacc', 'cfrc_int', 'cfrc_ext')
     flg_energypos: bool
     flg_energyvel: bool
     flg_rnepost: bool
@@ -607,6 +607,18 @@ class MjData:
         ...
     @flexvert_J.setter
     def flexvert_J(self, arg1: typing.Any) -> None:
+        ...
+    @property
+    def flexvert_conage(self) -> numpy.typing.NDArray[numpy.int32]:
+        ...
+    @flexvert_conage.setter
+    def flexvert_conage(self, arg1: typing.Any) -> None:
+        ...
+    @property
+    def flexvert_lambda(self) -> numpy.typing.NDArray[numpy.float64]:
+        ...
+    @flexvert_lambda.setter
+    def flexvert_lambda(self, arg1: typing.Any) -> None:
         ...
     @property
     def flexvert_length(self) -> numpy.typing.NDArray[numpy.float64]:
