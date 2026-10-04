@@ -316,6 +316,7 @@ def test_step_history_error_names_the_sim():
   assert np.any(history[0])  # the sims that ran still wrote their rows
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="resource is Unix-only")
 def test_memory_does_not_scale_with_num_sims():
   # A fresh process, so ru_maxrss growth is this batch's. One mjData per sim
   # grows it by 712 MB here; 4096 state vectors are a few MB.

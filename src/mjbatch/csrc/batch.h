@@ -433,7 +433,7 @@ class Batch {
   bool ParseDtype(const FieldInfo& f, std::optional<nb::object>& dtype) {
     if (!dtype || dtype->is_none()) return false;
     nb::object np = nb::module_::import_("numpy");
-    std::string name = nb::cast<std::string>(nb::str(np.attr("dtype")(*dtype).attr("name")));
+    std::string name = nb::cast<std::string>(np.attr("dtype")(*dtype).attr("name"));
     if (name == DtypeName(f.elem)) return false;
     if (name == "float32" && f.elem == Elem::Num) return true;
     throw nb::value_error((std::string(f.name) + " cannot be " + name).c_str());
