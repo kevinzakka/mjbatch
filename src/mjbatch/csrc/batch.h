@@ -267,6 +267,15 @@ struct Scalars {
   }
 };
 
+// On macOS setjmp saves the signal mask, a system call per simulation.
+#ifdef __APPLE__
+#define MJBATCH_SETJMP _setjmp
+#define MJBATCH_LONGJMP _longjmp
+#else
+#define MJBATCH_SETJMP setjmp
+#define MJBATCH_LONGJMP std::longjmp
+#endif
+
 // mju_error trap for worker threads: record the message and unwind to the
 // worker's setjmp; everything else goes to the handler that was active before.
 inline thread_local std::jmp_buf* tls_jmp = nullptr;
@@ -275,7 +284,7 @@ inline mjfLogHandler prev_log_handler = nullptr;
 inline void LogTrap(const mjLogMessage* msg) {
   if (msg->level == mjLOG_ERROR && tls_jmp) {
     tls_error = msg->subject;
-    std::longjmp(*tls_jmp, 1);
+    MJBATCH_LONGJMP(*tls_jmp, 1);
   }
   prev_log_handler(msg);
 }
@@ -627,7 +636,7 @@ class Batch {
   void Guarded(int t, int i, Op op, int arg, mjtNum* hist) {
     std::jmp_buf jb;
     tls_jmp = &jb;
-    if (setjmp(jb) == 0) {
+    if (MJBATCH_SETJMP(jb) == 0) {
       RunSim(t, i, op, arg, hist);
     } else {
       // The sim's state was not written back; the worker's mjData, left
@@ -668,11 +677,7 @@ class Batch {
       Guarded(t, p ? p[j] : j, op, arg,
               hist ? hist + static_cast<size_t>(j) * arg * nstate_ : nullptr);
     };
-    if (pool_->size() == 1) {
-      for (int j = 0; j < n; ++j) fn(0, j);
-    } else {
-      pool_->Run(n, fn);
-    }
+    pool_->Run(n, fn);
   }
 
   int num_sims_;
