@@ -1,12 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import mujoco
 import numpy as np
 
-from mjbatch._bindings import Batch as _Batch
+if sys.platform == "win32":
+  # The extension links mujoco.dll, which lives in the mujoco package.
+  os.add_dll_directory(str(Path(mujoco.__file__).parent))
+
+from mjbatch._bindings import Batch as _Batch  # noqa: E402
 
 _QPOS_WIDTH = {0: 7, 1: 4, 2: 1, 3: 1}  # by mjtJoint: free, ball, slide, hinge
 _DOF_WIDTH = {0: 6, 1: 3, 2: 1, 3: 1}
