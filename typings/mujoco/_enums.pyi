@@ -3834,16 +3834,19 @@ class mjtEnableBit:
     
       mjENBL_DIAGEXACT
     
+      mjENBL_IPC
+    
       mjNENABLE
     """
-    __members__: typing.ClassVar[dict[str, mjtEnableBit]]  # value = {'mjENBL_OVERRIDE': <mjtEnableBit.mjENBL_OVERRIDE: 1>, 'mjENBL_ENERGY': <mjtEnableBit.mjENBL_ENERGY: 2>, 'mjENBL_FWDINV': <mjtEnableBit.mjENBL_FWDINV: 4>, 'mjENBL_INVDISCRETE': <mjtEnableBit.mjENBL_INVDISCRETE: 8>, 'mjENBL_SLEEP': <mjtEnableBit.mjENBL_SLEEP: 16>, 'mjENBL_DIAGEXACT': <mjtEnableBit.mjENBL_DIAGEXACT: 32>, 'mjNENABLE': <mjtEnableBit.mjNENABLE: 6>}
+    __members__: typing.ClassVar[dict[str, mjtEnableBit]]  # value = {'mjENBL_OVERRIDE': <mjtEnableBit.mjENBL_OVERRIDE: 1>, 'mjENBL_ENERGY': <mjtEnableBit.mjENBL_ENERGY: 2>, 'mjENBL_FWDINV': <mjtEnableBit.mjENBL_FWDINV: 4>, 'mjENBL_INVDISCRETE': <mjtEnableBit.mjENBL_INVDISCRETE: 8>, 'mjENBL_SLEEP': <mjtEnableBit.mjENBL_SLEEP: 16>, 'mjENBL_DIAGEXACT': <mjtEnableBit.mjENBL_DIAGEXACT: 32>, 'mjENBL_IPC': <mjtEnableBit.mjENBL_IPC: 64>, 'mjNENABLE': <mjtEnableBit.mjNENABLE: 7>}
     mjENBL_DIAGEXACT: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_DIAGEXACT: 32>
     mjENBL_ENERGY: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_ENERGY: 2>
     mjENBL_FWDINV: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_FWDINV: 4>
     mjENBL_INVDISCRETE: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_INVDISCRETE: 8>
+    mjENBL_IPC: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_IPC: 64>
     mjENBL_OVERRIDE: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_OVERRIDE: 1>
     mjENBL_SLEEP: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjENBL_SLEEP: 16>
-    mjNENABLE: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjNENABLE: 6>
+    mjNENABLE: typing.ClassVar[mjtEnableBit]  # value = <mjtEnableBit.mjNENABLE: 7>
     @typing.overload
     def __add__(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> int:
         ...

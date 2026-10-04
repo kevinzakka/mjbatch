@@ -201,7 +201,7 @@ def mj_implicit(m: mujoco._structs.MjModel, d: mujoco._structs.MjData) -> None:
     """
     Implicit-in-velocity integrators.
     """
-def mj_initCtrlHistory(m: mujoco._structs.MjModel, d: mujoco._structs.MjData, id: typing.SupportsInt | typing.SupportsIndex, times: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None, values: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]) -> None:
+def mj_initCtrlHistory(m: mujoco._structs.MjModel, d: mujoco._structs.MjData, id: typing.SupportsInt | typing.SupportsIndex, times: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"] | None, values: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]", "flags.c_contiguous"]) -> None:
     """
     Initialize history buffer for actuator; if times is NULL, uses existing buffer timestamps.
     """
@@ -401,9 +401,9 @@ def mj_rayMesh(m: mujoco._structs.MjModel, d: mujoco._structs.MjData, geomid: ty
     """
     Intersect ray with mesh; return nearest distance or -1 if no intersection.
     """
-def mj_readCtrl(m: mujoco._structs.MjModel, d: mujoco._structs.MjData, id: typing.SupportsInt | typing.SupportsIndex, time: typing.SupportsFloat | typing.SupportsIndex, interp: typing.SupportsInt | typing.SupportsIndex) -> float:
+def mj_readCtrl(m: mujoco._structs.MjModel, d: mujoco._structs.MjData, id: typing.SupportsInt | typing.SupportsIndex, time: typing.SupportsFloat | typing.SupportsIndex, result: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]", "flags.writeable"], interp: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]", "flags.writeable"]:
     """
-    Read ctrl value for actuator at given time. Returns d->ctrl[id] if no history, otherwise reads from history buffer. interp: 0=zero-order-hold, 1=linear, 2=cubic spline.
+    Read ctrl value for actuator at given time. Returns pointer to ctrl (no history) or history buffer (exact match), or NULL if interpolation performed (writes to result). interp: 0=zero-order-hold, 1=linear, 2=cubic spline.
     """
 def mj_readSensor(m: mujoco._structs.MjModel, d: mujoco._structs.MjData, id: typing.SupportsInt | typing.SupportsIndex, time: typing.SupportsFloat | typing.SupportsIndex, result: typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]", "flags.writeable"], interp: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]", "flags.writeable"]:
     """
