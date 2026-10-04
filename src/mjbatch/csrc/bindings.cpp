@@ -64,7 +64,12 @@ Derived constants follow expanded inputs only after set_const, as with
 mj_setConst on one model. A MuJoCo error on a worker raises RuntimeError naming
 the first failing simulation; the others still ran, and the failing one keeps the
 state it had before the call, its writes still pending. The trap is a MuJoCo log
-handler installed at import; installing another handler later disables it.)")
+handler installed at import; installing another handler later disables it.
+
+rays and jac are queries: mj_ray and mj_jac for each simulation against its own
+geometry, which is its state with pending writes on top and its expanded model
+fields. A query runs only the part of the pipeline it needs, consumes no pending
+write, and updates no bound field.)")
       .def(nb::init<nb::object, int, int, bool>(), "model"_a, "num_sims"_a, "num_threads"_a = 0,
            "forward"_a = false,
            "num_threads=0 uses every logical CPU, clamped to num_sims. forward=True ends "
@@ -84,5 +89,22 @@ handler installed at import; installing another handler later disables it.)")
       .def("forward", &Batch::forward, "ids"_a.noconvert() = nb::none())
       .def("reset", &Batch::reset, "ids"_a.noconvert() = nb::none(), "keyframe"_a = -1,
            "mj_resetData, or mj_resetDataKeyframe when keyframe >= 0, then mj_forward.")
-      .def("set_const", &Batch::set_const, "ids"_a.noconvert() = nb::none());
+      .def("set_const", &Batch::set_const, "ids"_a.noconvert() = nb::none())
+      .def("rays", &Batch::rays, "pnt"_a.noconvert(), "vec"_a.noconvert(), "dist"_a.noconvert(),
+           "geomid"_a.noconvert() = nb::none(), "normal"_a.noconvert() = nb::none(),
+           "geomgroup"_a.noconvert() = nb::none(), "flg_static"_a = true,
+           "bodyexclude"_a.noconvert() = nb::none(), "ids"_a.noconvert() = nb::none(),
+           "mj_ray for every ray of every simulation. pnt and vec are (num_sims, nray, 3) "
+           "origins and directions in the world frame, float32 or the native dtype. dist "
+           "(num_sims, nray), and the optional geomid (int32) and normal (num_sims, nray, 3), "
+           "are caller-allocated and filled in place: dist is -1 and normal zero where a ray "
+           "hits nothing. geomgroup is mj_ray's six-entry uint8 mask, bodyexclude one int32 "
+           "body id per ray (-1 for none), and ids restricts which rows are computed.")
+      .def("jac", &Batch::jac, "jacp"_a.noconvert(), "jacr"_a.noconvert(), "point"_a.noconvert(),
+           "body"_a.noconvert(), "ids"_a.noconvert() = nb::none(),
+           "mj_jac for one point per simulation. point is (num_sims, 3) in the world frame, "
+           "float32 or the native dtype, and body (num_sims,) int32 is the body it moves with. "
+           "jacp and jacr are caller-allocated (num_sims, 3, nv) arrays filled in place with "
+           "the translational and rotational Jacobians; either may be None. ids restricts "
+           "which rows are computed.");
 }

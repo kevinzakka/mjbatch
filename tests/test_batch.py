@@ -714,3 +714,219 @@ def test_state_write_wins_over_unwritten_fields():
   np.testing.assert_array_equal(ctrl[:, 0], [1.0, 0.0])
   np.testing.assert_array_equal(mocap_pos[1, 0], 0.0)
   np.testing.assert_array_equal(xpos[1, model.body("mocap").id], 0.0)
+
+
+RAY_XML = """
+<mujoco>
+  <asset>
+    <mesh name="wedge" vertex="0 0 0  .4 0 0  0 .4 0  0 0 .3"/>
+    <hfield name="hills" nrow="4" ncol="4" size="1 1 .3 .1"
+            elevation="0 .2 .4 .1  .3 1 .6 .2  .1 .5 .9 .3  0 .2 .3 .1"/>
+  </asset>
+  <worldbody>
+    <geom name="floor" type="plane" size="5 5 .1"/>
+    <geom name="hills" type="hfield" hfield="hills" pos="3 0 0"/>
+    <geom name="wedge" type="mesh" mesh="wedge" pos="-2 0 0"/>
+    <body name="box" pos="0 0 .5">
+      <freejoint/>
+      <geom name="box" type="box" size=".3 .2 .1"/>
+      <geom name="ball" type="sphere" size=".15" pos="0 0 .3" group="1"/>
+    </body>
+    <body name="target" mocap="true" pos="1 1 1">
+      <geom name="target" type="capsule" size=".1 .2"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def _ray_setup(dtype):
+  """A batch with each sim's box and mocap body somewhere else, written but not stepped."""
+  model = mujoco.MjModel.from_xml_string(RAY_XML)
+  batch = Batch(model, N, 3)
+  rng = np.random.default_rng(0)
+  qpos = batch.bind("qpos")
+  qpos[:, :3] += rng.uniform(-0.3, 0.3, (N, 3))
+  quat = rng.normal(size=(N, 4))
+  qpos[:, 3:] = quat / np.linalg.norm(quat, axis=1, keepdims=True)
+  batch.bind("mocap_pos")[:] += rng.uniform(-0.5, 0.5, (N, 1, 3))
+  nray = 64
+  pnt = rng.uniform(-4, 4, (N, nray, 3)).astype(dtype)
+  pnt[..., 2] = rng.uniform(1.5, 3, (N, nray))
+  vec = rng.normal(size=(N, nray, 3))
+  vec[..., 2] = -np.abs(vec[..., 2]) - 1
+  vec = (vec / np.linalg.norm(vec, axis=-1, keepdims=True)).astype(dtype)
+  # The first two rays drop straight onto the mocap body, for the exclusion checks.
+  pnt[:, :2] = batch.bind("mocap_pos") + [0, 0, 1]
+  vec[:, :2] = [0, 0, -1]
+  return model, batch, pnt, vec
+
+
+def _reference_rays(model, batch, pnt, vec, geomgroup, flg_static, bodyexclude):
+  data = mujoco.MjData(model)
+  dist = np.empty(pnt.shape[:2])
+  geomid = np.empty(pnt.shape[:2], np.int32)
+  normal = np.zeros(pnt.shape)
+  hit, n = np.zeros(1, np.int32), np.zeros(3)
+  for i in range(N):
+    data.qpos[:] = batch.bind("qpos")[i]
+    data.mocap_pos[:] = batch.bind("mocap_pos")[i]
+    mujoco.mj_forward(model, data)
+    for k in range(pnt.shape[1]):
+      exclude = -1 if bodyexclude is None else int(bodyexclude[k])
+      dist[i, k] = mujoco.mj_ray(
+        model,
+        data,
+        pnt[i, k].astype(np.float64),
+        vec[i, k].astype(np.float64),
+        geomgroup,
+        flg_static,
+        exclude,
+        hit,
+        n,
+      )
+      geomid[i, k] = hit[0]
+      if dist[i, k] >= 0:
+        normal[i, k] = n
+  return dist, geomid, normal
+
+
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+@pytest.mark.parametrize("filtered", [False, True])
+def test_rays_match_mj_ray(dtype, filtered):
+  model, batch, pnt, vec = _ray_setup(dtype)
+  nray = pnt.shape[1]
+  geomgroup = np.array([1, 0, 0, 0, 0, 0], np.uint8) if filtered else None
+  bodyexclude = None
+  if filtered:
+    bodyexclude = np.where(np.arange(nray) % 2, model.body("target").id, -1)
+    bodyexclude = bodyexclude.astype(np.int32)
+  flg_static = not filtered
+  dist = np.empty((N, nray), dtype)
+  geomid = np.empty((N, nray), np.int32)
+  normal = np.empty((N, nray, 3), dtype)
+  batch.rays(pnt, vec, dist, geomid, normal, geomgroup, flg_static, bodyexclude)
+
+  want = _reference_rays(model, batch, pnt, vec, geomgroup, flg_static, bodyexclude)
+  tol = 1e-12 if dtype == np.float64 else 1e-5
+  np.testing.assert_array_equal(geomid, want[1])
+  np.testing.assert_allclose(dist, want[0], atol=tol)
+  np.testing.assert_allclose(normal, want[2], atol=tol)
+  hit = {model.geom(g).name for g in np.unique(geomid) if g >= 0}
+  if filtered:
+    assert hit == {"box", "target"}  # no static geoms, no group 1 ball
+    assert (geomid[:, 0] == model.geom("target").id).all()
+    assert (geomid[:, 1::2] != model.geom("target").id).all()
+  else:
+    assert hit == {"floor", "hills", "wedge", "box", "ball", "target"}
+
+
+def test_rays_are_a_query():
+  model, batch, pnt, vec = _ray_setup(np.float64)
+  xpos = batch.bind("xpos")
+  before = xpos.copy()
+  dist = np.full(pnt.shape[:2], 7.0)
+  ids = np.array([1, 4])
+  batch.rays(pnt, vec, dist, ids=ids)
+  assert (dist[ids] != 7.0).all()
+  assert (np.delete(dist, ids, axis=0) == 7.0).all()
+  np.testing.assert_array_equal(xpos, before)
+
+  # The pending qpos write the rays just read still reaches the next call.
+  batch.forward()
+  np.testing.assert_allclose(xpos[:, model.body("box").id], batch.bind("qpos")[:, :3])
+
+
+def test_rays_see_per_sim_geometry():
+  model, batch, _, _ = _ray_setup(np.float64)
+  batch.bind("qpos")[:, :7] = model.qpos0[:7]
+  half_height = np.linspace(0.05, 0.4, N)
+  box = model.geom("box").id
+  batch.expand("geom_size")[:, box, 2] = half_height
+  pnt = np.tile([0.25, 0.15, 3.0], (N, 1, 1))
+  vec = np.tile([0.0, 0.0, -1.0], (N, 1, 1))
+  dist = np.empty((N, 1))
+  batch.rays(pnt, vec, dist)
+  np.testing.assert_allclose(dist[:, 0], 3.0 - (0.5 + half_height))
+
+
+def test_rays_validation():
+  _, batch, pnt, vec = _ray_setup(np.float64)
+  dist = np.empty(pnt.shape[:2])
+  with pytest.raises(ValueError, match="dist"):
+    batch.rays(pnt, vec, dist.astype(np.float32))
+  with pytest.raises(ValueError, match="vec"):
+    batch.rays(pnt, vec[:, :-1], dist)
+  with pytest.raises(ValueError, match="pnt"):
+    batch.rays(pnt[:-1], vec[:-1], dist[:-1])
+  with pytest.raises(ValueError, match="bodyexclude"):
+    batch.rays(pnt, vec, dist, bodyexclude=np.zeros(3, np.int32))
+
+
+def _jac_setup(dtype):
+  """A batch with every sim in another pose, written but not stepped, and one point
+  and body per sim."""
+  model = mujoco.MjModel.from_xml_string(XML)
+  batch = Batch(model, N, 3)
+  rng = np.random.default_rng(0)
+  batch.bind("qpos")[:] = rng.uniform(-1, 1, (N, model.nq))
+  point = rng.uniform(-1, 1, (N, 3)).astype(dtype)
+  body = (1 + np.arange(N) % 3).astype(np.int32)  # cart, pole, puck
+  return model, batch, point, body
+
+
+def _reference_jac(model, batch, point, body):
+  data = mujoco.MjData(model)
+  jacp, jacr = np.empty((N, 3, model.nv)), np.empty((N, 3, model.nv))
+  for i in range(N):
+    data.qpos[:] = batch.bind("qpos")[i]
+    mujoco.mj_forward(model, data)
+    mujoco.mj_jac(model, data, jacp[i], jacr[i], point[i].astype(np.float64), body[i])
+  return jacp, jacr
+
+
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_jac_matches_mj_jac(dtype):
+  model, batch, point, body = _jac_setup(dtype)
+  jacp = np.empty((N, 3, model.nv), dtype)
+  jacr = np.empty((N, 3, model.nv), dtype)
+  batch.jac(jacp, jacr, point, body)
+
+  want_p, want_r = _reference_jac(model, batch, point, body)
+  tol = 1e-12 if dtype == np.float64 else 1e-6
+  np.testing.assert_allclose(jacp, want_p, atol=tol)
+  np.testing.assert_allclose(jacr, want_r, atol=tol)
+  assert np.abs(want_p).max() > 0.1 and np.abs(want_r).max() > 0.1
+
+  only_p, only_r = np.empty_like(jacp), np.empty_like(jacr)
+  batch.jac(only_p, None, point, body)
+  batch.jac(None, only_r, point, body)
+  np.testing.assert_array_equal(only_p, jacp)
+  np.testing.assert_array_equal(only_r, jacr)
+
+
+def test_jac_is_a_query():
+  model, batch, point, body = _jac_setup(np.float64)
+  xpos = batch.bind("xpos")
+  before = xpos.copy()
+  jacp = np.full((N, 3, model.nv), 7.0)
+  ids = np.array([1, 4])
+  batch.jac(jacp, None, point, body, ids)
+  assert (jacp[ids] != 7.0).all()
+  assert (np.delete(jacp, ids, axis=0) == 7.0).all()
+  np.testing.assert_array_equal(xpos, before)
+
+
+def test_jac_validation():
+  model, batch, point, body = _jac_setup(np.float64)
+  jacp = np.empty((N, 3, model.nv))
+  with pytest.raises(ValueError, match="jacp"):
+    batch.jac(jacp[:, :, :-1], None, point, body)
+  with pytest.raises(ValueError, match="jacr"):
+    batch.jac(jacp, jacp.astype(np.float32), point, body)
+  with pytest.raises(ValueError, match="point"):
+    batch.jac(jacp, None, point[:, :2], body)
+  with pytest.raises(ValueError, match="num_sims"):
+    batch.jac(jacp, None, point, body[:-1])
+  with pytest.raises(ValueError, match="nbody"):
+    batch.jac(jacp, None, point, np.full(N, model.nbody, np.int32))
