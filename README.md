@@ -74,6 +74,14 @@ RL controller learns to walk in under a minute on a five-year-old M1 laptop.
 Run with `uv run examples/<file>.py`; some need `uv sync --group examples`. The ones that open
 a window need a display; `--headless` runs the solver without one.
 
+### Humanoid Cricket Integration
+
+[`cricket_humanoid.py`](examples/cricket_humanoid.py) replays retained PPO/A2C
+checkpoints for right- and left-handed batting and running-bowling drills through
+native CPU-batched integration. It checks serial parity and preserves scripted
+motion and learned-control labels; it is not a throughput or new-training result.
+See the [pinned setup, videos, model limits, and tests](examples/cricket_humanoid.md).
+
 ## License
 
 Apache-2.0.
