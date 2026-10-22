@@ -5,6 +5,12 @@
 
 `mjbatch` is a Python library for running thousands of MuJoCo simulations in parallel on CPU.
 
+> [!NOTE]
+> This repository is archived. Batched simulation is now part of MuJoCo itself, which this project
+> inspired. Please use the
+> [`mjbatch` API](https://github.com/google-deepmind/mujoco/commit/c00ed815386eb2690c8be28855c45ea4d683e6c4)
+> in the main repository instead.
+
 Features include:
 
 * C++ thread pool execution, with the GIL released;
